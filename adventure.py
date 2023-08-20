@@ -151,11 +151,30 @@ class Room(Entity):
     def add_item(self, item: Item):
         super().link(item)
 
-    def get_items(self):
-        return dict(filter(lambda pair : isinstance(pair[1], Item) or isinstance(pair[1], Money), self.linked.items()))
+    def get_items(self, takeable_only=False):
+        if takeable_only:
+            return dict(filter(lambda pair : (isinstance(pair[1], Item) or isinstance(pair[1], Money)) and not pair[1].takeable == False, self.linked.items()))
+        else:
+            return dict(filter(lambda pair : isinstance(pair[1], Item) or isinstance(pair[1], Money), self.linked.items()))
 
     def get_rooms(self):
         return dict(filter(lambda pair : isinstance(pair[1], Room) or isinstance(pair[1], Door), self.linked.items()))
+
+    def get_doors(self):
+        return dict(filter(lambda pair : isinstance(pair[1], Door), self.linked.items()))
+
+    def get_actions(self):
+        actions = {}
+        for item in self.get_items().values():
+            for action in item.actions:
+                try:
+                    if not isinstance(actions[action], list):
+                        actions[action] = []
+                except KeyError:
+                    actions[action] = []
+                actions[action].append(item)
+
+        return actions
 
     @staticmethod
     def get_all():
@@ -252,9 +271,12 @@ class Adventure(cmd.Cmd):
         old_hot_dog.add_action("eat", self.eat_old_hot_dog)
         wig.add_action("wear", self.wear_wig)
         wig.add_action("remove", self.remove_wig)
+        book.add_action("read", self.read_book)
+        spoon.add_action("lick", self.lick_spoon)
+        hose.add_action("drink", self.drink_hose)
 
         living_room.add_item(paintbrush)
-        living_room.add_item(pillow)
+        living_room.add_item(book)
         living_room.add_item(computer)
         dining_room.add_item(old_hot_dog)
         dining_room.add_item(spoon)
@@ -289,6 +311,30 @@ class Adventure(cmd.Cmd):
 
     def help_remove(self):
         print("If you put something on, sometime you may want to take it off.")
+
+    def help_read(self):
+        print("You might find something worth reading.")
+
+    def help_lick(self):
+        print("Ewww, don't put that in your mouth. Unless you know it's tasty. Maybe just lick it...")
+
+    def help_drink(self):
+        print("Maybe you'll find a cool, refreshing beverage.")
+
+    def do_use(self, item):
+        return self.default(f"use {item}")
+    def do_eat(self, item):
+        return self.default(f"eat {item}")
+    def do_wear(self, item):
+        return self.default(f"wear {item}")
+    def do_remove(self, item):
+        return self.default(f"remove {item}")
+    def do_read(self, item):
+        return self.default(f"read {item}")
+    def do_lick(self, item):
+        return self.default(f"lick {item}")
+    def do_drink(self, item):
+        return self.default(f"drink {item}")
 
     def in_rooms(self, room: Room):
         try:
@@ -360,6 +406,9 @@ class Adventure(cmd.Cmd):
         else:
             print("That door isn't here")
 
+    def complete_unlock(self, text, line, begidx, endidx):
+        return [i for i in self.current_room.get_doors().keys() if i.startswith(text)]
+
 #    def do_traverse(self, name: str):
 #        print(Entity.world.get_linked(name).traverse(1))
             
@@ -388,6 +437,9 @@ class Adventure(cmd.Cmd):
         else:
             print("That item is not in this room!")
 
+    def complete_take(self, text, line, begidx, endidx):
+        return [i for i in self.current_room.get_items(takeable_only=True).keys() if i.startswith(text)]
+
     def do_drop(self, name: str):
         """Drop an item from inventory"""
         try:
@@ -406,6 +458,15 @@ class Adventure(cmd.Cmd):
         except NoEntityLinkException:
             print("That item doesn't exist")
 
+    def complete_drop(self, text, line, begidx, endidx):
+        items = [i for i in self.inv_items]
+        droppable = []
+        for item in items:
+            item = Item.get(item)
+            if item.droppable != False:
+                droppable.append(item.name)
+        return [i for i in droppable if i.startswith(text)]
+
     def do_inv(self, arg=None):
         """List items in inventory"""
         print("Items you have:", list(self.inv_items.keys()), " --  Money: $", '{:.2f}'.format(self.money))
@@ -420,6 +481,9 @@ class Adventure(cmd.Cmd):
                 print("That item isn't here")
         except NoEntityLinkException:
             print("That item doesn't exist")
+
+    def complete_look(self, text, line, begidx, endidx):
+        return [i for i in self.current_room.get_items().keys() if i.startswith(text)]
 
     def do_where(self, arg=None):
         """Show current room info"""
@@ -439,7 +503,16 @@ class Adventure(cmd.Cmd):
 
     def emptyline(self):
         pass
-    
+
+    def completedefault(self, text, line, begidx, endidx):
+        command = line.split(' ', 1)
+        item = command[1].lower()
+        action = command[0].lower()
+        items = []
+        for action_item in self.current_room.get_actions()[action]:
+            items.append(action_item.name)
+        return [i for i in items if i.startswith(item)]
+
     def default(self, line):
         def unknown():
             try:
@@ -512,7 +585,7 @@ class Adventure(cmd.Cmd):
             return True
         else:
             print("Couldn't put wig in inventory")
-            raise Error
+            raise OSError
 
     def remove_wig(self):
         print("You finally took that thing off?? It's about dang time, man...")
@@ -527,6 +600,19 @@ class Adventure(cmd.Cmd):
         except:
             pass
         return Entity.purge('old hot dog')
+
+    def read_book(self):
+        print("You open the book to a random spot, and read this:\n")
+        os.system("fortune")
+        return True
         
+    def lick_spoon(self):
+        print("Did you like that? Was it satisfying for you?")
+        return True
+        
+    def drink_hose(self):
+        print("You guzzle the brown stuff from the hose and tell yourself it was chocolate milk! Even as you bask in the glory of chocolate milk, your stomach gets very queasy. Then you throw up. Good job.")
+        return True
+
 if __name__ == '__main__':    
     Adventure().cmdloop()
