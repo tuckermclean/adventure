@@ -1,5 +1,5 @@
 from __future__ import annotations
-import cmd
+import cmd, code, os
 
 class EntityLinkException(Exception):
     "Thrown when there is already an Entity with this name"
@@ -89,9 +89,11 @@ class Entity:
 Entity.world = Entity("world", "The world as we know it")
 
 class Item(Entity):
-    def __init__(self, name = 'item', description = "No description"):
+    def __init__(self, name = 'item', description = "No description", droppable=True, takeable=True):
         super().__init__(name, description)
         self.actions = {}
+        self.droppable = droppable
+        self.takeable = takeable
 
     def add_item(self, item: Item):
         super().link(item)
@@ -194,11 +196,14 @@ class Adventure(cmd.Cmd):
         hallway = Room("hallway", "A dimly lit hallway which smells of dusty, old ladies and roten cheese")
         bathroom = Room("bathroom", "I really don't have to poop anymore, guys...")
         garden = Room("garden", "a very dead garden,yuck and one mysterious gold flower")
+        sidewalk = Room("sidewalk", "It's not much to look at, but it gets your feet places.")
 
         living_room.link_room(hallway)
+        living_room.link_room(dining_room)
         hallway.link_room(dining_room)
         hallway.link_room(bathroom)
         dining_room.link_room(kitchen)
+        sidewalk.link_room(garden)
         
         paintbrush = Item("paintbrush", "A very old, antique paintbrush. Looks like it was used by a big ol' hippy.")
         pillow = Item("pillow", "this is so yellow my eyes could burn")
@@ -207,37 +212,42 @@ class Adventure(cmd.Cmd):
         pan = Item("pan", "Encrusted with supper from long, long ago")
         knife = Item("knife", "It's duller than a bag of rocks. Somebody will cut themselves with this.")
         candlestick = Item("candlestick", "so bernd i think someone has used this so many times")
-        old_wig = Item("old wig", "This might have scabies maybe i should not wear it")
-        shiny_knob = Item("shiny knob", "Honestly, this is the best thing you\'ve seen in your life im crying right now")
+        wig = Item("wig", "This might have scabies maybe i should not wear it")
+        shiny_knob = Item("shiny knob", "Honestly, this is the best thing you\'ve seen in your life im crying right now", takeable=False, droppable=False)
         shoe = Item("shoe", "Right, 10 1/2 wide")
         book = Item("book", "A very olde booke of joke magical incantations.")
         gold_flower = Item("gold flower", "a odd flower thats golden. It smells like pee.")
         hose = Item("hose", "a very drippy old hose, that water is brown and what is that smell??")
         toilet = Item("toilet", "This toilet once stood as an art installation at the Metropolitan Museum of Art. Look at it now...")
         bathtub = Item("bathtub", "Imagine the first person who sees you carrying this out of the house, just look at their face!")
+        computer = Item("computer", "Would you look at that?! A computer! It looks really old, but it's running...", takeable=False, droppable=False)
+        phone = Item("phone", "It's an old pay phone! You might need to get some quarters to make a call.", takeable=False, droppable=False)
         key = Item("key", "A rather shiny key")
 
-        door = Door("front door", hallway, garden, locked=True, key=key)
+        front_door = Door("front door", hallway, garden, locked=True, key=key)
 
         paintbrush.add_action("use", self.use_paintbrush)
+        computer.add_action("use", self.use_computer)
         old_hot_dog.add_action("eat", self.eat_old_hot_dog)
-        old_wig.add_action("wear", self.wear_old_wig)
-        old_wig.add_action("remove", self.remove_old_wig)
+        wig.add_action("wear", self.wear_wig)
+        wig.add_action("remove", self.remove_wig)
 
         living_room.add_item(paintbrush)
         living_room.add_item(pillow)
+        living_room.add_item(computer)
         dining_room.add_item(old_hot_dog)
         dining_room.add_item(spoon)
         kitchen.add_item(pan)
         kitchen.add_item(knife)
         hallway.add_item(candlestick)
-        hallway.add_item(old_wig)
+        hallway.add_item(wig)
         hallway.add_item(shoe)
         bathroom.add_item(toilet)
         bathroom.add_item(bathtub)
         bathroom.add_item(key)
         garden.add_item(gold_flower)
         garden.add_item(hose)
+        sidewalk.add_item(phone)
 
         self.max_items = 5
         self.inv_items = {}
@@ -309,6 +319,8 @@ class Adventure(cmd.Cmd):
             if self.in_room_items(item):
                 if len(self.inv_items) >= 5:
                     print("You already have 5 items, buddy")
+                if not item.takeable:
+                    print("You can't take that, what are you thinking??")
                 else:
                     self.inv_items[name] = self.current_room.pop(name)
                     self.do_inv()
@@ -323,9 +335,12 @@ class Adventure(cmd.Cmd):
         try:
             item = Item.get(name)
             if item in self.inv_items.values():
-                del self.inv_items[name]
-                self.current_room.add_item(item)
-                self.do_inv()
+                if item.droppable:
+                    del self.inv_items[name]
+                    self.current_room.add_item(item)
+                    self.do_inv()
+                else:
+                    print("You can't drop that right now!")
             else:
                 print("You don't have that item, dingus")
         except KeyError:
@@ -384,12 +399,46 @@ class Adventure(cmd.Cmd):
         self.big_ol_hippy = True
         return True
 
-    def wear_old_wig(self):
-        print("Wearing wig")
+    def use_computer(self):
+        print("You sit down in front of the computer, and with a flick of your hand, the console comes to life...")
+        print()
+        print("PRESS ENTER TO CONTINUE...")
+        input()
+        
+        os.system("clear")
+
+        def exit():
+            print("Press Ctrl+D to quit using the computer")
+            
+        def quit():
+            exit()
+
+        variables = {**globals(), **locals()}
+        shell = code.InteractiveConsole(variables)
+        shell.interact()
+
+        print
+        self.current_room_intro()
         return True
 
-    def remove_old_wig(self):
-        print("Not wearing wig")
+    def wear_wig(self):
+        wig = Item.get("wig")
+        if self.in_room_items(wig):
+            self.do_take("wig")
+
+        if wig in self.inv_items.values():
+            print("You put on the wig. Somehow it makes you look even weirder.")
+            self.wearing_wig = True
+            Entity.world.get("wig").droppable = False
+            return True
+        else:
+            print("Couldn't put wig in inventory")
+            raise Error
+
+    def remove_wig(self):
+        print("You finally took that thing off?? It's about dang time, man...")
+        self.wearing_wig = False
+        Entity.world.get("wig").droppable = True
         return True
 
     def eat_old_hot_dog(self):
