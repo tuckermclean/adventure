@@ -1,35 +1,6 @@
-import pytest, string, random
+import pytest, random
 from adventure import *
-
-def randtext(k=5):
-    return ''.join(random.choices(string.ascii_letters, k=k))
-
-def test_world_exists():
-    assert Entity.world.name == "world"
-    assert isinstance(Entity.world, Entity)
-
-def wipe_world():
-    Entity.world = Entity("world")
-
-def dummy():
-    return Entity(randtext(), randtext(k=20))
-
-def dummy_tree(depth=3, display=False, root=None):
-    if root == None:
-        root = dummy()
-    else:
-        root = Entity.get(root)
-    for i in range(depth):
-        for e1 in list(root.traverse(entities={root.name: root})):
-            e1 = Entity.get(e1)
-            e2 = dummy()
-            e1.link(e2)
-            e2.link(e1)
-    if display:
-        for e in list(Entity.world.linked.values()):
-            print("NAME", e.name, "LINKED", e.linked)
-        print("DEPTH", depth, 'NUM OF ENTITIES TOTAL', len(Entity.world.linked))
-    return root
+from helpers import *
     
 def test_link():
     e1 = dummy()

@@ -58,14 +58,14 @@ class Entity:
         else:
             return False
 
-    @staticmethod
-    def get_all():
-        return dict(Entity.world.linked.items())
+    @classmethod
+    def get_all(cls):
+        return dict(filter(lambda pair : isinstance(pair[1], cls) or issubclass(pair[1].__class__, cls), Entity.world.linked.items()))
 
-    @staticmethod
-    def get(name):
+    @classmethod
+    def get(cls, name):
         try:
-            return Entity.get_all()[name]
+            return cls.get_all()[name]
         except KeyError:
             raise NoEntityLinkException
 
@@ -107,17 +107,6 @@ class Item(Entity):
         except KeyError:
             return None
 
-    @staticmethod
-    def get_all():
-        return dict(filter(lambda pair : isinstance(pair[1], Item), Entity.world.linked.items()))
-
-    @staticmethod
-    def get(name):
-        try:
-            return Item.get_all()[name]
-        except KeyError:
-            raise NoEntityLinkException
-
 #class VendingMachine(Item):
 #class Phone(Item):
 
@@ -125,17 +114,6 @@ class Money(Item):
     def __init__(self, name="money", description="some money", amount=1.00):
         super().__init__(name, description, droppable=False)
         self.amount = amount
-
-    @staticmethod
-    def get_all():
-        return dict(filter(lambda pair : isinstance(pair[1], Money), Entity.world.linked.items()))
-
-    @staticmethod
-    def get(name):
-        try:
-            return Money.get_all()[name]
-        except KeyError:
-            raise NoEntityLinkException
 
 class Room(Entity):
     def __init__(self, name='room', description = "An empty room"):
@@ -176,17 +154,6 @@ class Room(Entity):
 
         return actions
 
-    @staticmethod
-    def get_all():
-        return dict(filter(lambda pair : isinstance(pair[1], Room), Entity.world.linked.items()))
-
-    @staticmethod
-    def get(name):
-        try:
-            return Room.get_all()[name]
-        except KeyError:
-            raise NoEntityLinkException
-
 class Door(Room):
     def __init__(self, name: str, room1: Room, room2: Room, locked = True, key: Item = None):
         super().__init__(name, f"Door between {room1.name} and {room2.name}")
@@ -211,17 +178,6 @@ class Door(Room):
         if key == self.key:
             self.locked = False
         return self.locked == False
-
-    @staticmethod
-    def get_all():
-        return dict(filter(lambda pair : isinstance(pair[1], Door), Entity.world.linked.items()))
-
-    @staticmethod
-    def get(name):
-        try:
-            return Door.get_all()[name]
-        except KeyError:
-            raise NoEntityLinkException
 
 class Adventure(cmd.Cmd):
     def __init__(self):
