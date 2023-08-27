@@ -383,9 +383,9 @@ class Adventure(cmd.Cmd):
                 return False
             
         if self.in_room_items(item):
-            if len(self.inv_items) >= 5:
-                print("You already have 5 items, buddy")
-            if not item.takeable:
+            if len(self.inv_items) >= self.max_items:
+                print(f"You already have {self.max_items} items, buddy")
+            elif not item.takeable:
                 print("You can't take that, what are you thinking??")
             else:
                 self.inv_items[name] = self.current_room.pop(name)
@@ -452,7 +452,9 @@ class Adventure(cmd.Cmd):
     def do_reset(self, arg=None):
         """Reset the game"""
         self.postloop()
-        Adventure().cmdloop()
+        Entity.world = Entity("world")
+        Adventure.game = Adventure()
+        Adventure.game.cmdloop()
 
     def postloop(self):
         return True
@@ -571,4 +573,5 @@ class Adventure(cmd.Cmd):
         return True
 
 if __name__ == '__main__':    
-    Adventure().cmdloop()
+    Adventure.game = Adventure()
+    Adventure.game.cmdloop()
