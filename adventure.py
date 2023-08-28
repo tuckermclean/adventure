@@ -1,5 +1,5 @@
 from __future__ import annotations
-import cmd, code, os
+import cmd, code, os, random
 
 class EntityLinkException(Exception):
     "Thrown when there is already an Entity with this name"
@@ -179,8 +179,73 @@ class Door(Room):
             self.locked = False
         return self.locked == False
 
+class Character(Item):
+    def __init__(self, name="player", description="The main player", current_room=None):
+        super().__init__(name=name, description=description, droppable=False, takeable=False)
+
+        self.current_room = None
+        self.max_items = 5
+        self.inv_items = {}
+        self.money = float(0)
+        self.inv_items = {}
+        self.words = ""
+
+        if current_room != None and current_room.__class__ == Room:
+            self.go(current_room)
+
+    def loopit(self):
+        pass
+
+    def in_rooms(self, room: Room):
+        try:
+            return room.name in list(self.current_room.get_rooms().keys())
+        except:
+            return False
+
+    def in_room_items(self, item: Item):
+        try:
+            return item.name in list(self.current_room.get_items().keys())
+        except:
+            return False
+
+    def spend(self, amount):
+        if self.money >= amount:
+            self.money = self.money - amount
+            print('$', '{:.2f}'.format(amount), 'spent.')
+#FIXME            self.do_inv()
+            return amount
+        else:
+            print("You don't have that kind of money, peasant.")
+            return
+ #FIXME           return self.do_inv()
+
+    def say(self, words="blah blah blah"):
+        self.words = words
+
+    def go(self, room = Room, check_link=True):
+        if self.current_room == None or (check_link and self.in_rooms(room)) or check_link == False:
+            if self.current_room != None:
+                self.current_room.pop(self.name)
+            self.current_room = room
+            self.current_room.add_item(self)
+        else:
+            print("WALKER", self.name, "GO", room.name, "DIDN'T WORK")
+
+class WalkerCharacter(Character):
+    def loopit(self):
+        try:
+            move = random.choice([True, False])
+            if move:
+                room = None
+                while room.__class__ != Room:
+                    room = random.choice(list(self.current_room.get_rooms().values()))
+                #print("WALKER", self.name, "GO", room.name)
+                self.go(room)
+        except EntityLinkException:
+            pass
+
 class Adventure(cmd.Cmd):
-    def __init__(self):
+    def __init__(self, player=None):
         self.prompt = "> "
         self.file = None
         
@@ -249,11 +314,20 @@ class Adventure(cmd.Cmd):
         garden.add_item(hose)
         sidewalk.add_item(phone)
 
-        self.max_items = 5
-        self.inv_items = {}
-        self.money = float(0)
+        if player == None:
+            self.player = Character()
+        else:
+            self.player = player
+        self.player.go(Room.get("living room"))
 
-        self.current_room = living_room
+        def pet_cat():
+            print("*PURRRR*")
+            return True
+        
+        cat = WalkerCharacter(name="cat", description="There's a cat, sleek and black.", current_room=Room.get("living room"))
+        cat.add_action("pet", pet_cat)
+        cat.say("*MEOW*")
+
         super().__init__()
 
     def help_use(self):
@@ -277,6 +351,9 @@ class Adventure(cmd.Cmd):
     def help_drink(self):
         print("Maybe you'll find a cool, refreshing beverage.")
 
+    def help_pet(self):
+        print("Have you ever been on a quest without something cute and furry showing up?")
+
     def do_use(self, item):
         return self.default(f"use {item}")
     def do_eat(self, item):
@@ -292,28 +369,6 @@ class Adventure(cmd.Cmd):
     def do_drink(self, item):
         return self.default(f"drink {item}")
 
-    def in_rooms(self, room: Room):
-        try:
-            return room.name in list(self.current_room.get_rooms().keys())
-        except:
-            return False
-
-    def in_room_items(self, item: Item):
-        try:
-            return item.name in list(self.current_room.get_items().keys())
-        except:
-            return False
-
-    def spend(self, amount):
-        if self.money >= amount:
-            self.money = self.money - amount
-            print('$', '{:.2f}'.format(amount), 'spent.')
-            self.do_inv()
-            return amount
-        else:
-            print("You don't have that kind of money, peasant.")
-            return self.do_inv()
-
     def do_go(self, name: str):
         """Go from one room to another"""
         try:
@@ -325,23 +380,28 @@ class Adventure(cmd.Cmd):
                 print("That room doesn't exist")
                 return False
 
-        if self.in_rooms(room):
+        if self.player.in_rooms(room):
             if isinstance(room, Door):
                 if room.locked:
                     print("That door is locked")
                     return False
                 else:
-                    self.current_room = room.get_other(self.current_room)
+                    other = room.get_other(self.player.current_room)
+                    self.player.current_room.pop(self.player.name)
+                    self.player.current_room = other
+                    self.player.current_room.add_item(self.player)
                     self.current_room_intro()
             else:
-                self.current_room = room
+                self.player.current_room.pop(self.player.name)
+                self.player.current_room = room
+                self.player.current_room.add_item(self.player)
                 self.current_room_intro()
         else:
             print("That room isn't next door!")
             return False
 
     def complete_go(self, text, line, begidx, endidx):
-        return [i for i in self.current_room.get_rooms().keys() if i.startswith(text)]
+        return [i for i in self.player.current_room.get_rooms().keys() if i.startswith(text)]
     
     def do_unlock(self, name: str):
         """Unlock a door"""
@@ -351,10 +411,10 @@ class Adventure(cmd.Cmd):
             print("That door doesn't exist")
             return False
 
-        if self.in_rooms(door):
+        if self.player.in_rooms(door):
             if door.locked == False:
                 print("This door is already unlocked")
-            elif door.key in self.inv_items.values():
+            elif door.key in self.player.inv_items.values():
                 door.locked = False
                 print("Door unlocked")
             else:
@@ -363,7 +423,7 @@ class Adventure(cmd.Cmd):
             print("That door isn't here")
 
     def complete_unlock(self, text, line, begidx, endidx):
-        return [i for i in self.current_room.get_doors().keys() if i.startswith(text)]
+        return [i for i in self.player.current_room.get_doors().keys() if i.startswith(text)]
 
 #    def do_traverse(self, name: str):
 #        print(Entity.world.get_linked(name).traverse(1))
@@ -372,8 +432,8 @@ class Adventure(cmd.Cmd):
         """Take an item"""
         try:
             item = Money.get(name)
-            self.current_room.pop(name)
-            self.money = self.money + item.amount
+            self.player.current_room.pop(name)
+            self.player.money = self.player.money + item.amount
             return self.do_inv()
         except:
             try:
@@ -382,28 +442,28 @@ class Adventure(cmd.Cmd):
                 print("That item doesn't exist")
                 return False
             
-        if self.in_room_items(item):
-            if len(self.inv_items) >= self.max_items:
-                print(f"You already have {self.max_items} items, buddy")
+        if self.player.in_room_items(item):
+            if len(self.player.inv_items) >= self.player.max_items:
+                print(f"You already have {self.player.max_items} items, buddy")
             elif not item.takeable:
                 print("You can't take that, what are you thinking??")
             else:
-                self.inv_items[name] = self.current_room.pop(name)
+                self.player.inv_items[name] = self.player.current_room.pop(name)
                 self.do_inv()
         else:
             print("That item is not in this room!")
 
     def complete_take(self, text, line, begidx, endidx):
-        return [i for i in self.current_room.get_items(takeable_only=True).keys() if i.startswith(text)]
+        return [i for i in self.player.current_room.get_items(takeable_only=True).keys() if i.startswith(text)]
 
     def do_drop(self, name: str):
         """Drop an item from inventory"""
         try:
             item = Item.get(name)
-            if item in self.inv_items.values():
+            if item in self.player.inv_items.values():
                 if item.droppable:
-                    del self.inv_items[name]
-                    self.current_room.add_item(item)
+                    del self.player.inv_items[name]
+                    self.player.current_room.add_item(item)
                     self.do_inv()
                 else:
                     print("You can't drop that right now!")
@@ -415,7 +475,7 @@ class Adventure(cmd.Cmd):
             print("That item doesn't exist")
 
     def complete_drop(self, text, line, begidx, endidx):
-        items = [i for i in self.inv_items]
+        items = [i for i in self.player.inv_items]
         droppable = []
         for item in items:
             item = Item.get(item)
@@ -425,13 +485,13 @@ class Adventure(cmd.Cmd):
 
     def do_inv(self, arg=None):
         """List items in inventory"""
-        print("Items you have:", list(self.inv_items.keys()), " --  Money: $", '{:.2f}'.format(self.money))
+        print("Items you have:", list(self.player.inv_items.keys()), " --  Money: $", '{:.2f}'.format(self.player.money))
 
     def do_look(self, name: str):
         """Look at an item"""
         try:
             item = Item.get(name)
-            if item in self.inv_items or self.in_room_items(item):
+            if item in self.player.inv_items or self.player.in_room_items(item):
                 print(name.upper(), " -- " , item.description)
             else:
                 print("That item isn't here")
@@ -439,7 +499,7 @@ class Adventure(cmd.Cmd):
             print("That item doesn't exist")
 
     def complete_look(self, text, line, begidx, endidx):
-        return [i for i in self.current_room.get_items().keys() if i.startswith(text)]
+        return [i for i in self.player.current_room.get_items().keys() if i.startswith(text)]
 
     def do_where(self, arg=None):
         """Show current room info"""
@@ -467,7 +527,7 @@ class Adventure(cmd.Cmd):
         item = command[1].lower()
         action = command[0].lower()
         items = []
-        for action_item in self.current_room.get_actions()[action]:
+        for action_item in self.player.current_room.get_actions()[action]:
             items.append(action_item.name)
         return [i for i in items if i.startswith(item)]
 
@@ -475,7 +535,7 @@ class Adventure(cmd.Cmd):
         def unknown():
             try:
                 room = Room.get(line)
-                if self.in_rooms(room):
+                if self.player.in_rooms(room):
                     return self.do_go(line)
             except NoEntityLinkException:                
                 print("I don't know how to do that")
@@ -484,24 +544,37 @@ class Adventure(cmd.Cmd):
         try:
             item = Item.get(command[1].lower())
             action = command[0].lower()
-
-            if not item.do(action):
+            if self.player.in_room_items(item) or item in self.player.inv_items.values():
+                    if not item.do(action):
+                        unknown()
+            else:
                 unknown()
         except:
             unknown()
         
     def current_room_intro(self):
-        print('You are in:', self.current_room.name.upper(), ' -- ', self.current_room.description)
-        print('In this room, there are:', list(self.current_room.get_items().keys()))
-        print('The rooms next door:', list(self.current_room.get_rooms().keys()))
-
+        for char in dict(filter(lambda pair : self.player.in_room_items(pair[1]), Character.get_all().items())).values():
+            char.loopit()
+        print('You are in:', self.player.current_room.name.upper(), ' -- ', self.player.current_room.description)
+        print('In this room, there are:', list(dict(filter(lambda pair : pair[1] != self.player, self.player.current_room.get_items().items())).keys()))
+        print('The rooms next door:', list(self.player.current_room.get_rooms().keys()))
+        print()
+        for char in dict(filter(lambda pair : self.player.in_room_items(pair[1]) and pair[1] != self.player, Character.get_all().items())).values():
+            try:
+                if char.words != "":
+                    print(f"{char.description}\t{char.words}")
+                else:
+                    print(f"{char.description}")
+            except:
+                print(f"{char.description}")
+                
     def preloop(self):
         print("Welcome to the adventure game!   Type help or ? to list commands.\n")
         self.current_room_intro()
 
     def use_paintbrush(self):
         print("OMG LOOK, A BIG OL' HIPPY!")
-        self.big_ol_hippy = True
+        self.player.big_ol_hippy = True
         return True
 
     def use_computer(self):
@@ -525,7 +598,7 @@ class Adventure(cmd.Cmd):
 
     def use_phone(self):
         print("This phone costs $ 0.25 cents to use.")
-        if self.spend(0.25):
+        if self.player.spend(0.25):
             print("Thank you, call again.")
         else:
             print("Come back with some quarters next time.")
@@ -533,12 +606,12 @@ class Adventure(cmd.Cmd):
 
     def wear_wig(self):
         wig = Item.get("wig")
-        if self.in_room_items(wig):
+        if self.player.in_room_items(wig):
             self.do_take("wig")
 
-        if wig in self.inv_items.values():
+        if wig in self.player.inv_items.values():
             print("You put on the wig. Somehow it makes you look even weirder.")
-            self.wearing_wig = True
+            self.player.wearing_wig = True
             Entity.world.get("wig").droppable = False
             return True
         else:
@@ -547,14 +620,14 @@ class Adventure(cmd.Cmd):
 
     def remove_wig(self):
         print("You finally took that thing off?? It's about dang time, man...")
-        self.wearing_wig = False
+        self.player.wearing_wig = False
         Entity.world.get("wig").droppable = True
         return True
 
     def eat_old_hot_dog(self):
         print("You somehow manage to choke down a 300 year old, all beef hot dog. Were it not for your well-lubricated esophagus, you would be dead right now. Let's hope you don't get food poisoning or become a zombified, hot dog person. Nasty.")
         try:
-            self.inv_items.remove(Item.get('old hot dog'))
+            self.player.inv_items.remove(Item.get('old hot dog'))
         except:
             pass
         return Entity.purge('old hot dog')
@@ -572,6 +645,7 @@ class Adventure(cmd.Cmd):
         print("You guzzle the brown stuff from the hose and tell yourself it was chocolate milk! Even as you bask in the glory of chocolate milk, your stomach gets very queasy. Then you throw up. Good job.")
         return True
 
-if __name__ == '__main__':    
-    Adventure.game = Adventure()
+if __name__ == '__main__':
+    Adventure.player = Character()
+    Adventure.game = Adventure(Adventure.player)
     Adventure.game.cmdloop()
