@@ -1,5 +1,5 @@
 from __future__ import annotations
-import cmd, code, os, random
+import cmd, code, os, random, re
 
 class EntityLinkException(Exception):
     "Thrown when there is already an Entity with this name"
@@ -17,6 +17,12 @@ class Entity:
 
         if Entity.world != None:
             Entity.world.link(self)
+
+    def __str__(self):
+        return f"<{self.__class__}:{self.name}>"
+
+    def __repr__(self):
+        return self.__str__()
 
     def link(self, linked: Entity, override = False):
         if linked.name not in self.linked.keys() or override == True:
@@ -369,6 +375,21 @@ class Adventure(cmd.Cmd):
     def do_drink(self, item):
         return self.default(f"drink {item}")
 
+    def do_test(self, arg=None):
+        self.do_go("hallway")
+        self.do_go("bathroom")
+        self.do_take("key")
+        self.do_go("hallway")
+        self.do_go("dining room")
+        self.do_go("kitchen")
+        self.do_take("quarters")
+        self.do_go("dining room")
+        self.do_go("hallway")
+        self.do_unlock("front door")
+        self.do_go("front door")
+        self.do_go("sidewalk")
+        self.do_use("phone")
+
     def do_go(self, name: str):
         """Go from one room to another"""
         try:
@@ -599,7 +620,64 @@ class Adventure(cmd.Cmd):
     def use_phone(self):
         print("This phone costs $ 0.25 cents to use.")
         if self.player.spend(0.25):
-            print("Thank you, call again.")
+
+            print("**RINGING**")
+            api_key=""
+            from openai import OpenAI
+            client = OpenAI(api_key=api_key)
+
+            def get_or_create_assistant(name, model, instructions):
+                # Check if the assistant already exists
+                assistants = client.beta.assistants.list()
+                for assistant in assistants.data:
+                    if assistant.name == name:
+                        return assistant  # Return existing assistant if found
+
+                # If not found, create a new assistant
+                return client.beta.assistants.create(
+                    name=name,
+                    model=model,
+                    instructions=instructions,
+                )
+
+            assistant = get_or_create_assistant(
+                name="grumpy_old_man",
+                model="gpt-3.5-turbo",
+                instructions="You are a crotchety old man, and a terrible conversationalist. You hate to be interrupted, even though you're never doing anything important. The user is calling you on the phone, and you answer in a very amusing way. Don't worry about sounds or actions, just generate the man's words. Sometimes he randomly hangs up.",
+            )
+            thread = client.beta.threads.create()
+
+            client.beta.threads.messages.create(
+                thread_id=thread.id,
+                role="user",
+                content="phone rings"
+            )
+
+            messages = None
+            hangups = "goodbye|hangs up|click"
+
+            while messages == None or not re.search(hangups, messages.data[0].content[0].text.value.lower(), re.IGNORECASE):
+                run = client.beta.threads.runs.create_and_poll(
+                    thread_id=thread.id,
+                    assistant_id=assistant.id
+                )
+                if run.status == 'completed': 
+                    messages = client.beta.threads.messages.list(thread_id=thread.id)
+                    print()
+                    print(messages.data[0].content[0].text.value)
+                    if re.search(hangups, messages.data[0].content[0].text.value.lower(), re.IGNORECASE):
+                        break
+                else:
+                    print(run.status)
+
+                print("(input): ", end="")
+                message = client.beta.threads.messages.create(
+                    thread_id=thread.id,
+                    role="user",
+                    content=input()
+                )
+
+            print("\n*Thank you, call again.*")
         else:
             print("Come back with some quarters next time.")
         return True

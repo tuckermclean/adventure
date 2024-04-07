@@ -19,12 +19,12 @@ def test_pop():
     with pytest.raises(KeyError):
         Entity.world.get_linked(e2.name)
 
-@pytest.fixture
-def dummy_tree_root(depth):
-    wipe_world()
-    root = dummy()
-    dummy_tree(root=root.name, depth=depth)
-    yield root
+# @pytest.fixture
+# def dummy_tree_root(depth):
+#     wipe_world()
+#     root = dummy()
+#     dummy_tree(root=root.name, depth=depth)
+#     yield root
 
 @pytest.mark.parametrize("depth", [1,2,3,4,5,6,7,8])
 def test_build_tree(depth):
