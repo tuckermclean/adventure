@@ -1,5 +1,6 @@
 from __future__ import annotations
 import cmd, code, os, random, re
+from openai import OpenAI
 
 class EntityLinkException(Exception):
     "Thrown when there is already an Entity with this name"
@@ -8,7 +9,7 @@ class NoEntityLinkException(Exception):
     "Thrown when there is no near-enough link to an Entity with this name"
 
 class Entity:
-    world = None;
+    world = None
 
     def __init__(self, name = 'No name', description = 'No description'):
         self.name = name
@@ -137,12 +138,12 @@ class Room(Entity):
 
     def get_items(self, takeable_only=False):
         if takeable_only:
-            return dict(filter(lambda pair : (isinstance(pair[1], Item) or isinstance(pair[1], Money)) and not pair[1].takeable == False, self.linked.items()))
+            return dict(filter(lambda pair : isinstance(pair[1], Item) and not pair[1].takeable == False, self.linked.items()))
         else:
-            return dict(filter(lambda pair : isinstance(pair[1], Item) or isinstance(pair[1], Money), self.linked.items()))
+            return dict(filter(lambda pair : isinstance(pair[1], Item), self.linked.items()))
 
     def get_rooms(self):
-        return dict(filter(lambda pair : isinstance(pair[1], Room) or isinstance(pair[1], Door), self.linked.items()))
+        return dict(filter(lambda pair : isinstance(pair[1], Room), self.linked.items()))
 
     def get_doors(self):
         return dict(filter(lambda pair : isinstance(pair[1], Door), self.linked.items()))
@@ -184,6 +185,32 @@ class Door(Room):
         if key == self.key:
             self.locked = False
         return self.locked == False
+
+class Phone(Item):
+    def __init__(self, name="phone", description="An old phone", cost=0.25, costmsg="No service", mobile=False):
+        super().__init__(name=name, description=description, droppable=mobile, takeable=mobile)
+        self.cost = cost
+        self.costmsg = costmsg
+
+    def call(self, callee: str=None):
+        print(f"This phone costs $ {self.cost} to use.")
+        callees = dict(filter(lambda pair : pair[1].phoneable, AICharacter.get_all().items()))
+        if callee == None:
+            print("Who you gonna call? ", end="")
+            print(list(callees.keys()))
+            callee = input("(input): ")
+        if callee in callees.keys():
+            if Adventure.player.spend(self.cost):
+                print("**RINGING**")
+                callees[callee].talk(phone=True)
+                print("\n*Thank you, call again.*\n")
+                Adventure.game.current_room_intro()
+            else:
+                print(self.costmsg)
+        else:
+            print("You can't call them.")
+        return True
+
 
 class Character(Item):
     def __init__(self, name="player", description="The main player", current_room=None):
@@ -250,6 +277,121 @@ class WalkerCharacter(Character):
         except EntityLinkException:
             pass
 
+class OpenAIClient():
+    client = None
+
+    @staticmethod
+    def connect(api_key=""):
+        if OpenAIClient.client == None:
+            OpenAIClient.client = OpenAI(api_key=api_key)
+
+    @staticmethod
+    def get_or_create_assistant(name, instructions, model="gpt-3.5-turbo"):
+        # Check if the assistant already exists
+        assistants = OpenAIClient.client.beta.assistants.list()
+        for assistant in assistants.data:
+            if assistant.name == name:
+                return assistant  # Return existing assistant if found
+
+        # If not found, create a new assistant
+        return OpenAIClient.client.beta.assistants.create(
+            name=name,
+            model=model,
+            instructions=instructions,
+        )
+
+class AICharacter(Character):
+    def __init__(self, name="ai character", description="Some NPC", current_room=None,
+                 prompt="You are a less-than helpful, yet amusing, assistant.",
+                 phone_prompt=("The user is calling you on the phone, and you answer in an amusing way. "
+                               "Don't worry about sounds or actions, just generate the words.")):
+        super().__init__(name=name, description=description, current_room=current_room)
+        self.phoneable = (phone_prompt != None)
+
+        OpenAIClient.connect()
+        self.assistant = OpenAIClient.get_or_create_assistant(
+            name=name,
+            instructions=prompt,
+        )
+        self.thread = OpenAIClient.client.beta.threads.create()
+
+        if self.phoneable:
+            self.phone_assistant = OpenAIClient.get_or_create_assistant(
+                name=f"{name}_phone",
+                instructions=f"{prompt} {phone_prompt}",
+            )
+
+            self.phone_thread = OpenAIClient.client.beta.threads.create()
+
+    def talk(self, msg=None, phone=False):
+        OpenAIClient.connect()
+        thread = None
+        assistant = None
+
+        if phone and self.phoneable:
+            thread = self.phone_thread
+            assistant = self.phone_assistant
+
+            OpenAIClient.client.beta.threads.messages.create(
+                thread_id=thread.id,
+                role="user",
+                content="phone rings"
+            )
+
+        elif phone and not self.phoneable:
+            print("You can't call that character.")
+            return
+        else:
+            thread = self.thread
+            assistant = self.assistant
+            if msg != None:
+                OpenAIClient.client.beta.threads.messages.create(
+                    thread_id=thread.id,
+                    role="user",
+                    content=msg
+                )
+            else:
+                last_input = input("(input): ")
+                message = OpenAIClient.client.beta.threads.messages.create(
+                    thread_id=thread.id,
+                    role="user",
+                    content=last_input
+                )
+
+        messages = None
+        last_input = ""
+        hangups = "bye|\*hangs up\*|\*click\*"
+
+        while messages == None or (not re.search(hangups, messages.data[0].content[0].text.value.lower(), re.IGNORECASE) and not re.search(hangups, last_input.lower(), re.IGNORECASE)):
+
+            run = OpenAIClient.client.beta.threads.runs.create_and_poll(
+                thread_id=thread.id,
+                assistant_id=assistant.id
+            )
+            if run.status == 'completed': 
+                messages = OpenAIClient.client.beta.threads.messages.list(thread_id=thread.id)
+                print()
+                print(messages.data[0].content[0].text.value)
+                if re.search(hangups, messages.data[0].content[0].text.value.lower(), re.IGNORECASE) or re.search(hangups, last_input.lower(), re.IGNORECASE):
+                    if not phone:
+                        Adventure.game.current_room_intro()
+                    return True
+                #else:
+                #    print(run.status)
+
+            last_input = input("(input): ")
+            if messages != None:
+                if re.search(hangups, messages.data[0].content[0].text.value.lower(), re.IGNORECASE) or re.search(hangups, last_input.lower(), re.IGNORECASE):
+                    if not phone:
+                        Adventure.game.current_room_intro()
+                    return True
+            message = OpenAIClient.client.beta.threads.messages.create(
+                thread_id=thread.id,
+                role="user",
+                content=last_input
+            )
+
+
 class Adventure(cmd.Cmd):
     def __init__(self, player=None):
         self.prompt = "> "
@@ -286,7 +428,8 @@ class Adventure(cmd.Cmd):
         toilet = Item("toilet", "This toilet once stood as an art installation at the Metropolitan Museum of Art. Look at it now...")
         bathtub = Item("bathtub", "Imagine the first person who sees you carrying this out of the house, just look at their face!")
         computer = Item("computer", "Would you look at that?! A computer! It looks really old, but it's running...", takeable=False, droppable=False)
-        phone = Item("phone", "It's an old pay phone! You might need to get some change to make a call.", takeable=False, droppable=False)
+        payphone = Phone("payphone", "It's an old pay phone! You might need to get some change to make a call.", cost=0.25, costmsg="Come back with some quarters next time.")
+        cellphone = Phone("cell phone", "It's an old cell phone! I wonder if it has any service...", cost=0.01, costmsg="No money, no phone service!", mobile=True)
         quarters = Money("quarters", "Oooh, a pile of quarters!", amount=2.25)
         key = Item("key", "A rather shiny key")
 
@@ -294,7 +437,8 @@ class Adventure(cmd.Cmd):
 
         paintbrush.add_action("use", self.use_paintbrush)
         computer.add_action("use", self.use_computer)
-        phone.add_action("use", self.use_phone)
+        payphone.add_action("use", payphone.call)
+        cellphone.add_action("use", cellphone.call)
         old_hot_dog.add_action("eat", self.eat_old_hot_dog)
         wig.add_action("wear", self.wear_wig)
         wig.add_action("remove", self.remove_wig)
@@ -307,6 +451,7 @@ class Adventure(cmd.Cmd):
         living_room.add_item(computer)
         dining_room.add_item(old_hot_dog)
         dining_room.add_item(spoon)
+        dining_room.add_item(cellphone)
         kitchen.add_item(pan)
         kitchen.add_item(knife)
         kitchen.add_item(quarters)
@@ -318,7 +463,7 @@ class Adventure(cmd.Cmd):
         bathroom.add_item(key)
         garden.add_item(gold_flower)
         garden.add_item(hose)
-        sidewalk.add_item(phone)
+        sidewalk.add_item(payphone)
 
         if player == None:
             self.player = Character()
@@ -333,6 +478,22 @@ class Adventure(cmd.Cmd):
         cat = WalkerCharacter(name="cat", description="There's a cat, sleek and black.", current_room=Room.get("living room"))
         cat.add_action("pet", pet_cat)
         cat.say("*MEOW*")
+
+        old_man = AICharacter(name="old man", description="There's a crotchety, old man. He doesn't seem to be in a good mood.", 
+                              prompt=("You are a crotchety old man, and a terrible conversationalist. You hate to be interrupted, "
+                                      "even though you're never doing anything important."),
+                              phone_prompt=("The user is calling you on the phone, and you answer in a very amusing way. Don't worry about "
+                                            "sounds or actions, just generate the man's words. Sometimes he randomly hangs up."))
+        old_man.add_action("talk", old_man.talk)
+        kitchen.add_item(old_man)
+
+        carl = AICharacter(name="carl", description="Oh, there's Carl...",
+                           prompt=("You are a happy-go-lucky but thoroughly dense young chap named Carl. You are a friend, not an assistant. You "
+                                   "sometimes forget what you're talking about. You try very hard to not talk about turtles, but sometimes "
+                                   "you can't help yourself. Your mental bandwidth is frighteningly scarce."))
+        carl.add_action("talk", carl.talk)
+        sidewalk.add_item(carl)
+
 
         super().__init__()
 
@@ -360,6 +521,9 @@ class Adventure(cmd.Cmd):
     def help_pet(self):
         print("Have you ever been on a quest without something cute and furry showing up?")
 
+    def help_talk(self):
+        print("Everybody needs somebody sometimes!")
+
     def do_use(self, item):
         return self.default(f"use {item}")
     def do_eat(self, item):
@@ -374,6 +538,10 @@ class Adventure(cmd.Cmd):
         return self.default(f"lick {item}")
     def do_drink(self, item):
         return self.default(f"drink {item}")
+    def do_pet(self, item):
+        return self.default(f"pet {item}")
+    def do_talk(self, item):
+        return self.default(f"talk {item}")
 
     def do_test(self, arg=None):
         self.do_go("hallway")
@@ -388,7 +556,7 @@ class Adventure(cmd.Cmd):
         self.do_unlock("front door")
         self.do_go("front door")
         self.do_go("sidewalk")
-        self.do_use("phone")
+        self.do_use("payphone")
 
     def do_go(self, name: str):
         """Go from one room to another"""
@@ -558,7 +726,7 @@ class Adventure(cmd.Cmd):
                 room = Room.get(line)
                 if self.player.in_rooms(room):
                     return self.do_go(line)
-            except NoEntityLinkException:                
+            except NoEntityLinkException as e:                
                 print("I don't know how to do that")
             
         command = line.split(' ', 1)
@@ -619,67 +787,19 @@ class Adventure(cmd.Cmd):
 
     def use_phone(self):
         print("This phone costs $ 0.25 cents to use.")
-        if self.player.spend(0.25):
-
-            print("**RINGING**")
-            api_key=""
-            from openai import OpenAI
-            client = OpenAI(api_key=api_key)
-
-            def get_or_create_assistant(name, model, instructions):
-                # Check if the assistant already exists
-                assistants = client.beta.assistants.list()
-                for assistant in assistants.data:
-                    if assistant.name == name:
-                        return assistant  # Return existing assistant if found
-
-                # If not found, create a new assistant
-                return client.beta.assistants.create(
-                    name=name,
-                    model=model,
-                    instructions=instructions,
-                )
-
-            assistant = get_or_create_assistant(
-                name="grumpy_old_man",
-                model="gpt-3.5-turbo",
-                instructions="You are a crotchety old man, and a terrible conversationalist. You hate to be interrupted, even though you're never doing anything important. The user is calling you on the phone, and you answer in a very amusing way. Don't worry about sounds or actions, just generate the man's words. Sometimes he randomly hangs up.",
-            )
-            thread = client.beta.threads.create()
-
-            client.beta.threads.messages.create(
-                thread_id=thread.id,
-                role="user",
-                content="phone rings"
-            )
-
-            messages = None
-            hangups = "goodbye|hangs up|click"
-
-            while messages == None or not re.search(hangups, messages.data[0].content[0].text.value.lower(), re.IGNORECASE):
-                run = client.beta.threads.runs.create_and_poll(
-                    thread_id=thread.id,
-                    assistant_id=assistant.id
-                )
-                if run.status == 'completed': 
-                    messages = client.beta.threads.messages.list(thread_id=thread.id)
-                    print()
-                    print(messages.data[0].content[0].text.value)
-                    if re.search(hangups, messages.data[0].content[0].text.value.lower(), re.IGNORECASE):
-                        break
-                else:
-                    print(run.status)
-
-                print("(input): ", end="")
-                message = client.beta.threads.messages.create(
-                    thread_id=thread.id,
-                    role="user",
-                    content=input()
-                )
-
-            print("\n*Thank you, call again.*")
+        print("Who you gonna call? ", end="")
+        callees = dict(filter(lambda pair : pair[1].phoneable, AICharacter.get_all().items()))
+        print(list(callees.keys()))
+        callee = input("(input): ")
+        if callee in callees.keys():
+            if self.player.spend(0.25):
+                print("**RINGING**")
+                callees[callee].talk(phone=True)
+                print("\n*Thank you, call again.*")
+            else:
+                print("Come back with some quarters next time.")
         else:
-            print("Come back with some quarters next time.")
+            print("You can't call them.")
         return True
 
     def wear_wig(self):
