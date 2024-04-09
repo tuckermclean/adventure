@@ -1,5 +1,5 @@
 from __future__ import annotations
-import cmd, code, os, random, re
+import cmd2, code, os, random, re, shlex
 from openai import OpenAI
 
 class EntityLinkException(Exception):
@@ -15,6 +15,7 @@ class Entity:
         self.name = name
         self.description = description
         self.linked = {}
+        self.actions = {}
 
         if Entity.world != None:
             Entity.world.link(self)
@@ -41,6 +42,18 @@ class Entity:
             return popped
         else:
             raise NoEntityLinkException
+
+    def add_action(self, name="doink", function = lambda: True):
+        self.actions[name] = function
+
+    def remove_action(self, name="doink"):
+        del self.actions[name]
+
+    def do(self, action):
+        try:
+            return self.actions[action]()
+        except KeyError:
+            return None
 
     def traverse(self, max_levels=-1, first_level=0, entities=None):
         if entities == None:
@@ -96,23 +109,49 @@ class Entity:
 Entity.world = Entity("world", "The world as we know it")
 
 class Item(Entity):
-    def __init__(self, name = 'item', description = "No description", droppable=True, takeable=True):
-        super().__init__(name, description)
-        self.actions = {}
+    def __init__(self, name = 'item', description = "No description", droppable=True, takeable=True, lookable=True):
+        Entity.__init__(self, name, description)
         self.droppable = droppable
         self.takeable = takeable
+        if takeable:
+            self.add_action("take", self.take)
+        if lookable:
+            self.add_action("look", self.look)
 
     def add_item(self, item: Item):
         super().link(item)
 
-    def add_action(self, name = "use", function = lambda: True):
-        self.actions[name] = function
+    def look(self):
+        print(self.name.upper(), " -- " , self.description)
+        return True
 
-    def do(self, action):
-        try:
-            return self.actions[action]()
-        except KeyError:
-            return None
+    def take(self):
+        """Take an item"""
+        if Adventure.player.in_room_items(self):
+            if len(Adventure.player.inv_items) >= Adventure.player.max_items:
+                print(f"You already have {Adventure.player.max_items} items, buddy")
+            else:
+                Adventure.player.inv_items[self.name] = Adventure.player.current_room.pop(self.name)
+                self.remove_action("take")
+                if self.droppable:
+                    self.add_action("drop", self.drop)
+                Adventure.game.do_inv()
+        else:
+            print("That item is not in this room!")
+        return True
+    
+    def drop(self):
+        """Drop an item from inventory"""
+        if self in Adventure.player.inv_items.values():
+            del Adventure.player.inv_items[self.name]
+            Adventure.player.current_room.add_item(self)
+            self.remove_action("drop")
+            if self.takeable:
+                self.add_action("take", self.take)
+            Adventure.game.do_inv()
+        else:
+            print("You don't have that item, dingus")
+        return True
 
 #class VendingMachine(Item):
 #class Phone(Item):
@@ -121,10 +160,57 @@ class Money(Item):
     def __init__(self, name="money", description="some money", amount=1.00):
         super().__init__(name, description, droppable=False)
         self.amount = amount
+        self.add_action("take", self.take)
+    
+    def take(self):
+        Adventure.player.current_room.pop(self.name)
+        Adventure.player.money = Adventure.player.money + self.amount
+        Adventure.game.do_inv()
+        return True
+
+class Wearable(Item):
+    def __init__(self, name="hat", description="A silly hat", wear_msg="You put on the hat.", remove_msg="You took off the hat."):
+        super().__init__(name, description, takeable=True, droppable=True)
+        self.wear_msg = wear_msg
+        self.remove_msg = remove_msg
+        self.add_action("wear", self.wear)
+
+    def wear(self):
+        if Adventure.player.in_room_items(self):
+           self.take()
+
+        if self in Adventure.player.inv_items.values():
+            print(self.wear_msg)
+            Adventure.player.wearing[self.name] = self
+            self.add_action("remove", self.remove)
+            self.droppable = False
+            self.remove_action("drop")
+            self.remove_action("wear")
+        else:
+            print(f"Something wrong: couldn't wear {self.name}")
+        return True
+
+    def remove(self):
+        print(self.remove_msg)
+        self.remove_action("remove")
+        del Adventure.player.wearing[self.name]
+        self.droppable = True
+        self.add_action("drop", self.drop)
+        self.add_action("wear", self.wear)
+        return True
+
 
 class Room(Entity):
     def __init__(self, name='room', description = "An empty room"):
         super().__init__(name, description)
+        self.add_action("go", self.go)
+
+    def go(self):
+        Adventure.player.current_room.pop(Adventure.player.name)
+        Adventure.player.current_room = self
+        Adventure.player.current_room.add_item(Adventure.player)
+        Adventure.game.current_room_intro()
+        return True
 
     def link_room(self, room: Room):
         try:
@@ -150,7 +236,7 @@ class Room(Entity):
 
     def get_actions(self):
         actions = {}
-        for item in self.get_items().values():
+        for item in list(self.linked.values()) + list(Adventure.player.inv_items.values()):
             for action in item.actions:
                 try:
                     if not isinstance(actions[action], list):
@@ -168,6 +254,11 @@ class Door(Room):
         super().link_room(room2)
         self.locked = locked
         self.key = key
+        if self.locked:
+            self.add_action("unlock", self.unlock)
+        elif self.key != None:
+            self.add_action("lock", self.lock)
+        self.add_action("go", self.go)
 
     def get_other(self, room: Room) -> Room:
         names = list(self.linked.keys())
@@ -176,23 +267,91 @@ class Door(Room):
         else:
             return self.linked[names[0]]
         
-    def lock(self, key):
-        if key == self.key:
-            self.locked = True
-        return self.locked == True
+    # def lock(self, key):
+    #     if key == self.key:
+    #         self.locked = True
+    #     return self.locked == True
 
-    def unlock(self, key):
-        if key == self.key:
-            self.locked = False
-        return self.locked == False
+    # def unlock(self, key):
+    #     if key == self.key:
+    #         self.locked = False
+    #     return self.locked == False
+    
+    def go(self):
+        if self.locked == False:
+            Adventure.player.current_room.pop(Adventure.player.name)
+            Adventure.player.current_room = self.get_other(Adventure.player.current_room)
+            Adventure.player.current_room.add_item(Adventure.player)
+            Adventure.game.current_room_intro()
+        else:
+            print("That door is locked.")
+        return True
 
-class Phone(Item):
+    def unlock(self):
+        """Unlock a door"""
+        if Adventure.player.in_rooms(self):
+            if self.locked == False:
+                print("This door is already unlocked")
+            elif self.key in Adventure.player.inv_items.values():
+                self.locked = False
+                print("Door unlocked")
+                self.remove_action("unlock")
+                self.add_action("lock", self.lock)
+            else:
+                print("You don't have the key to unlock this door")
+        else:
+            print("That door isn't here")
+        return True
+    
+    def lock(self):
+        if Adventure.player.in_rooms(self):
+            if self.locked == True:
+                print("This door is already locked")
+            elif self.key in Adventure.player.inv_items.values():
+                self.locked = True
+                print("Door locked")
+                self.remove_action("lock")
+                self.add_action("unlock", self.unlock)
+            else:
+                print("You don't have the key to lock this door")
+        else:
+            print("That door isn't here")
+        return True
+
+class Useable(Item):
+    def __init__(self, name="useful item", description="A useful item", takeable=True, droppable=True, verb="use",
+                 use_msg="So useful!", func=lambda: True):
+        Item.__init__(self, name, description, takeable, droppable)
+        self.use_msg = use_msg
+        self.func = func
+        self.add_action(verb, self.use)
+
+    def use(self):
+        print(self.use_msg)
+        self.func()
+        return True
+    
+class Eatable(Useable):
+    def __init__(self, name="food", description="A tasty item", takeable=True, droppable=True, verb="eat",
+                 use_msg="Yummy!", func=lambda: True):
+        super().__init__(name, description, takeable, droppable, verb, use_msg, func)
+
+    def use(self):
+        super().use()
+        try:
+            Adventure.player.inv_items.remove(self)
+        except:
+            pass
+        return Entity.purge(self.name)
+
+class Phone(Useable):
     def __init__(self, name="phone", description="An old phone", cost=0.25, costmsg="No service", mobile=False):
         super().__init__(name=name, description=description, droppable=mobile, takeable=mobile)
         self.cost = cost
         self.costmsg = costmsg
+        self.add_action("use", self.use)
 
-    def call(self, callee: str=None):
+    def use(self, callee: str=None):
         print(f"This phone costs $ {self.cost} to use.")
         callees = dict(filter(lambda pair : pair[1].phoneable, AICharacter.get_all().items()))
         if callee == None:
@@ -211,16 +370,40 @@ class Phone(Item):
             print("You can't call them.")
         return True
 
+class Computer(Useable):
+    def __init__(self, name="computer", description="A computer", mobile=False):
+        super().__init__(name=name, description=description, droppable=mobile, takeable=mobile)
+        self.add_action("use", self.use)
+
+    def use(self):
+        print()
+        print("You sit down in front of the computer, and with a flick of your hand, the console comes to life...")
+        print("PRESS ENTER TO CONTINUE...", end="")
+        input()
+        
+        os.system("clear")
+
+        exit = "Press Ctrl+D to quit using the computer"
+        quit = exit
+
+        variables = {**globals(), **locals()}
+        shell = code.InteractiveConsole(variables)
+        shell.interact()
+
+        print()
+        Adventure.game.current_room_intro()
+        return True
 
 class Character(Item):
-    def __init__(self, name="player", description="The main player", current_room=None):
-        super().__init__(name=name, description=description, droppable=False, takeable=False)
+    def __init__(self, name="player", description="The main player", current_room=None, lookable=True):
+        Item.__init__(self, name=name, description=description, droppable=False, takeable=False, lookable=lookable)
 
         self.current_room = None
         self.max_items = 5
         self.inv_items = {}
         self.money = float(0)
         self.inv_items = {}
+        self.wearing = {}
         self.words = ""
 
         if current_room != None and current_room.__class__ == Room:
@@ -235,9 +418,9 @@ class Character(Item):
         except:
             return False
 
-    def in_room_items(self, item: Item):
+    def in_room_items(self, item: Entity):
         try:
-            return item.name in list(self.current_room.get_items().keys())
+            return item.name in list(self.current_room.linked.keys())
         except:
             return False
 
@@ -265,6 +448,18 @@ class Character(Item):
             print("WALKER", self.name, "GO", room.name, "DIDN'T WORK")
 
 class WalkerCharacter(Character):
+    def __init__(self, name="walker", description="Just walking around", current_room=None, lookable=True, verb="greet",
+                 use_msg="Hi!", func=lambda: True):
+        Character.__init__(self, name=name, description=description, current_room=current_room, lookable=lookable)
+        self.use_msg = use_msg
+        self.func = func
+        self.add_action(verb, self.use)
+    
+    def use(self):
+        print(self.use_msg)
+        self.func()
+        return True
+
     def loopit(self):
         try:
             move = random.choice([True, False])
@@ -307,6 +502,7 @@ class AICharacter(Character):
                                "Don't worry about sounds or actions, just generate the words.")):
         super().__init__(name=name, description=description, current_room=current_room)
         self.phoneable = (phone_prompt != None)
+        self.add_action("talk", self.talk)
 
         OpenAIClient.connect()
         self.assistant = OpenAIClient.get_or_create_assistant(
@@ -392,7 +588,7 @@ class AICharacter(Character):
             )
 
 
-class Adventure(cmd.Cmd):
+class Adventure(cmd2.Cmd):
     def __init__(self, player=None):
         self.prompt = "> "
         self.file = None
@@ -411,40 +607,42 @@ class Adventure(cmd.Cmd):
         hallway.link_room(bathroom)
         dining_room.link_room(kitchen)
         sidewalk.link_room(garden)
-        
-        paintbrush = Item("paintbrush", "A very old, antique paintbrush. Looks like it was used by a big ol' hippy.")
+            
+        paintbrush = Useable("paintbrush", "A very old, antique paintbrush. Looks like it was used by a big ol' hippy.",
+                             use_msg="OMG LOOK, A BIG OL' HIPPY!", func=lambda: setattr(Adventure.player, "big_ol_hippy", True))
         pillow = Item("pillow", "this is so yellow my eyes could burn")
-        old_hot_dog = Item("old hot dog", "It has a weird little kink in it, like someone tried to bite it a long time ago.")
-        spoon = Item("spoon", "A little crusty, but if you lick it and wipe it on your shirt, it might get shiny.")
+        old_hot_dog = Eatable("old hot dog", "It has a weird little kink in it, like someone tried to bite it a long time ago.",
+                              use_msg=("You somehow manage to choke down a 300 year old, all beef hot dog. Were it not for your "
+                              "well-lubricated esophagus, you would be dead right now. Let's hope you don't get food poisoning "
+                              "or become a zombified, hot dog person. Nasty."))
+        spoon = Useable("spoon", "A little crusty, but if you lick it and wipe it on your shirt, it might get shiny.", verb="lick",
+                        use_msg="Did you like that? Was it satisfying for you?")
         pan = Item("pan", "Encrusted with supper from long, long ago")
         knife = Item("knife", "It's duller than a bag of rocks. Still, somebody will cut themselves with this.")
         candlestick = Item("candlestick", "So burned I think someone has used this so many times")
-        wig = Item("wig", "This might have scabies; maybe I should not wear it")
+        wig = Wearable("wig", "This might have scabies; maybe I should not wear it",
+                       wear_msg="You put on the wig. Somehow it makes you look even weirder.",
+                       remove_msg="You finally took that thing off?? It's about dang time, man...")
         shiny_knob = Item("shiny knob", "Honestly, this is the best thing you\'ve seen in your life im crying right now", takeable=False, droppable=False)
-        shoe = Item("shoe", "Right, 10 1/2 wide")
-        book = Item("book", "A very olde booke of joke magical incantations.")
+        shoe = Wearable("shoe", "Right, 10 1/2 wide",
+                        wear_msg="You try like the most graceful of Cinderella's evil step-sisters to squeeze the shoe on your foot. You exclaim: \"IT FITS!\"",
+                        remove_msg="OH MY GOODNESS, FINALLY! Your foot throbs an aching cadence of relief.")
+        book = Useable("book", "A very olde booke of joke magical incantations.", verb="read",
+                       use_msg="You open the book to a random spot, and read this:\n", func=lambda: os.system("fortune"))
         gold_flower = Item("gold flower", "An odd flower that's golden. It smells like pee.")
-        hose = Item("hose", "A very drippy old hose. That water is brown, and what is that smell??")
+        hose = Useable("hose", "A very drippy old hose. That water is brown, and what is that smell??", verb="drink",
+                       use_msg=("You guzzle the brown stuff from the hose and tell yourself it was chocolate milk! Even as "
+                                "you bask in the glory of chocolate milk, your stomach gets very queasy. Then you throw up. "
+                                "Good job."))
         toilet = Item("toilet", "This toilet once stood as an art installation at the Metropolitan Museum of Art. Look at it now...")
         bathtub = Item("bathtub", "Imagine the first person who sees you carrying this out of the house, just look at their face!")
-        computer = Item("computer", "Would you look at that?! A computer! It looks really old, but it's running...", takeable=False, droppable=False)
+        computer = Computer("computer", "Would you look at that?! A computer! It looks really old, but it's running...", mobile=False)
         payphone = Phone("payphone", "It's an old pay phone! You might need to get some change to make a call.", cost=0.25, costmsg="Come back with some quarters next time.")
         cellphone = Phone("cell phone", "It's an old cell phone! I wonder if it has any service...", cost=0.01, costmsg="No money, no phone service!", mobile=True)
         quarters = Money("quarters", "Oooh, a pile of quarters!", amount=2.25)
         key = Item("key", "A rather shiny key")
 
         front_door = Door("front door", hallway, garden, locked=True, key=key)
-
-        paintbrush.add_action("use", self.use_paintbrush)
-        computer.add_action("use", self.use_computer)
-        payphone.add_action("use", payphone.call)
-        cellphone.add_action("use", cellphone.call)
-        old_hot_dog.add_action("eat", self.eat_old_hot_dog)
-        wig.add_action("wear", self.wear_wig)
-        wig.add_action("remove", self.remove_wig)
-        book.add_action("read", self.read_book)
-        spoon.add_action("lick", self.lick_spoon)
-        hose.add_action("drink", self.drink_hose)
 
         living_room.add_item(paintbrush)
         living_room.add_item(book)
@@ -471,27 +669,20 @@ class Adventure(cmd.Cmd):
             self.player = player
         self.player.go(Room.get("living room"))
 
-        def pet_cat():
-            print("*PURRRR*")
-            return True
-        
-        cat = WalkerCharacter(name="cat", description="There's a cat, sleek and black.", current_room=Room.get("living room"))
-        cat.add_action("pet", pet_cat)
-        cat.say("*MEOW*")
+        cat = WalkerCharacter(name="cat", description="There's a cat, sleek and black.", current_room=Room.get("living room"),
+                              verb="pet", use_msg="*PURRRR*")
 
         old_man = AICharacter(name="old man", description="There's a crotchety, old man. He doesn't seem to be in a good mood.", 
                               prompt=("You are a crotchety old man, and a terrible conversationalist. You hate to be interrupted, "
                                       "even though you're never doing anything important."),
                               phone_prompt=("The user is calling you on the phone, and you answer in a very amusing way. Don't worry about "
                                             "sounds or actions, just generate the man's words. Sometimes he randomly hangs up."))
-        old_man.add_action("talk", old_man.talk)
         kitchen.add_item(old_man)
 
         carl = AICharacter(name="carl", description="Oh, there's Carl...",
                            prompt=("You are a happy-go-lucky but thoroughly dense young chap named Carl. You are a friend, not an assistant. You "
                                    "sometimes forget what you're talking about. You try very hard to not talk about turtles, but sometimes "
                                    "you can't help yourself. Your mental bandwidth is frighteningly scarce."))
-        carl.add_action("talk", carl.talk)
         sidewalk.add_item(carl)
 
 
@@ -524,171 +715,21 @@ class Adventure(cmd.Cmd):
     def help_talk(self):
         print("Everybody needs somebody sometimes!")
 
-    def do_use(self, item):
-        return self.default(f"use {item}")
-    def do_eat(self, item):
-        return self.default(f"eat {item}")
-    def do_wear(self, item):
-        return self.default(f"wear {item}")
-    def do_remove(self, item):
-        return self.default(f"remove {item}")
-    def do_read(self, item):
-        return self.default(f"read {item}")
-    def do_lick(self, item):
-        return self.default(f"lick {item}")
-    def do_drink(self, item):
-        return self.default(f"drink {item}")
-    def do_pet(self, item):
-        return self.default(f"pet {item}")
-    def do_talk(self, item):
-        return self.default(f"talk {item}")
+    def help_go(self):
+        print("Go where you wanna go, yo.")
 
-    def do_test(self, arg=None):
-        self.do_go("hallway")
-        self.do_go("bathroom")
-        self.do_take("key")
-        self.do_go("hallway")
-        self.do_go("dining room")
-        self.do_go("kitchen")
-        self.do_take("quarters")
-        self.do_go("dining room")
-        self.do_go("hallway")
-        self.do_unlock("front door")
-        self.do_go("front door")
-        self.do_go("sidewalk")
-        self.do_use("payphone")
+    def help_look(self):
+        print("Look at an item; the description is probably funny.")
 
-    def do_go(self, name: str):
-        """Go from one room to another"""
-        try:
-            room = Room.get(name)
-        except NoEntityLinkException:
-            try:
-                door = Door.get(name)
-            except NoEntityLinkException:
-                print("That room doesn't exist")
-                return False
+    def help_take(self):
+        print("You can take some items into your inventory. Beware of cursed and/or stinky items.")
 
-        if self.player.in_rooms(room):
-            if isinstance(room, Door):
-                if room.locked:
-                    print("That door is locked")
-                    return False
-                else:
-                    other = room.get_other(self.player.current_room)
-                    self.player.current_room.pop(self.player.name)
-                    self.player.current_room = other
-                    self.player.current_room.add_item(self.player)
-                    self.current_room_intro()
-            else:
-                self.player.current_room.pop(self.player.name)
-                self.player.current_room = room
-                self.player.current_room.add_item(self.player)
-                self.current_room_intro()
-        else:
-            print("That room isn't next door!")
-            return False
-
-    def complete_go(self, text, line, begidx, endidx):
-        return [i for i in self.player.current_room.get_rooms().keys() if i.startswith(text)]
-    
-    def do_unlock(self, name: str):
-        """Unlock a door"""
-        try:
-            door = Door.get(name)
-        except NoEntityLinkException:
-            print("That door doesn't exist")
-            return False
-
-        if self.player.in_rooms(door):
-            if door.locked == False:
-                print("This door is already unlocked")
-            elif door.key in self.player.inv_items.values():
-                door.locked = False
-                print("Door unlocked")
-            else:
-                print("You don't have the key to unlock this door")
-        else:
-            print("That door isn't here")
-
-    def complete_unlock(self, text, line, begidx, endidx):
-        return [i for i in self.player.current_room.get_doors().keys() if i.startswith(text)]
-
-#    def do_traverse(self, name: str):
-#        print(Entity.world.get_linked(name).traverse(1))
-            
-    def do_take(self, name: str):
-        """Take an item"""
-        try:
-            item = Money.get(name)
-            self.player.current_room.pop(name)
-            self.player.money = self.player.money + item.amount
-            return self.do_inv()
-        except:
-            try:
-                item = Item.get(name)
-            except:
-                print("That item doesn't exist")
-                return False
-            
-        if self.player.in_room_items(item):
-            if len(self.player.inv_items) >= self.player.max_items:
-                print(f"You already have {self.player.max_items} items, buddy")
-            elif not item.takeable:
-                print("You can't take that, what are you thinking??")
-            else:
-                self.player.inv_items[name] = self.player.current_room.pop(name)
-                self.do_inv()
-        else:
-            print("That item is not in this room!")
-
-    def complete_take(self, text, line, begidx, endidx):
-        return [i for i in self.player.current_room.get_items(takeable_only=True).keys() if i.startswith(text)]
-
-    def do_drop(self, name: str):
-        """Drop an item from inventory"""
-        try:
-            item = Item.get(name)
-            if item in self.player.inv_items.values():
-                if item.droppable:
-                    del self.player.inv_items[name]
-                    self.player.current_room.add_item(item)
-                    self.do_inv()
-                else:
-                    print("You can't drop that right now!")
-            else:
-                print("You don't have that item, dingus")
-        except KeyError:
-            print("That item doesn't exist")
-        except NoEntityLinkException:
-            print("That item doesn't exist")
-
-    def complete_drop(self, text, line, begidx, endidx):
-        items = [i for i in self.player.inv_items]
-        droppable = []
-        for item in items:
-            item = Item.get(item)
-            if item.droppable != False:
-                droppable.append(item.name)
-        return [i for i in droppable if i.startswith(text)]
+    def help_drop(self):
+        print("You can drop most items from your inventory. Unless you're wearing them.")
 
     def do_inv(self, arg=None):
         """List items in inventory"""
         print("Items you have:", list(self.player.inv_items.keys()), " --  Money: $", '{:.2f}'.format(self.player.money))
-
-    def do_look(self, name: str):
-        """Look at an item"""
-        try:
-            item = Item.get(name)
-            if item in self.player.inv_items or self.player.in_room_items(item):
-                print(name.upper(), " -- " , item.description)
-            else:
-                print("That item isn't here")
-        except NoEntityLinkException:
-            print("That item doesn't exist")
-
-    def complete_look(self, text, line, begidx, endidx):
-        return [i for i in self.player.current_room.get_items().keys() if i.startswith(text)]
 
     def do_where(self, arg=None):
         """Show current room info"""
@@ -712,34 +753,32 @@ class Adventure(cmd.Cmd):
         pass
 
     def completedefault(self, text, line, begidx, endidx):
-        command = line.split(' ', 1)
-        item = command[1].lower()
+        command = shlex.split(line)
+        try:
+            item = command[1].lower()
+        except IndexError:
+            item = ""
         action = command[0].lower()
         items = []
         for action_item in self.player.current_room.get_actions()[action]:
             items.append(action_item.name)
         return [i for i in items if i.startswith(item)]
 
+    def get_all_commands(self):
+        return list(self.player.current_room.get_actions().keys()) + ['exit', 'help', 'inv', 'reset', 'where']
+
     def default(self, line):
-        def unknown():
-            try:
-                room = Room.get(line)
-                if self.player.in_rooms(room):
-                    return self.do_go(line)
-            except NoEntityLinkException as e:                
-                print("I don't know how to do that")
-            
-        command = line.split(' ', 1)
+        command = shlex.split(line.raw)
         try:
-            item = Item.get(command[1].lower())
+            item = Entity.get(command[1].lower())
             action = command[0].lower()
             if self.player.in_room_items(item) or item in self.player.inv_items.values():
-                    if not item.do(action):
-                        unknown()
+                if not item.do(action):
+                    print("I don't know how to do that")
             else:
-                unknown()
+                print("I don't know how to do that")
         except:
-            unknown()
+            print("I don't know how to do that")
         
     def current_room_intro(self):
         for char in dict(filter(lambda pair : self.player.in_room_items(pair[1]), Character.get_all().items())).values():
@@ -761,89 +800,7 @@ class Adventure(cmd.Cmd):
         print("Welcome to the adventure game!   Type help or ? to list commands.\n")
         self.current_room_intro()
 
-    def use_paintbrush(self):
-        print("OMG LOOK, A BIG OL' HIPPY!")
-        self.player.big_ol_hippy = True
-        return True
-
-    def use_computer(self):
-        print()
-        print("You sit down in front of the computer, and with a flick of your hand, the console comes to life...")
-        print("PRESS ENTER TO CONTINUE...", end="")
-        input()
-        
-        os.system("clear")
-
-        exit = "Press Ctrl+D to quit using the computer"
-        quit = exit
-
-        variables = {**globals(), **locals()}
-        shell = code.InteractiveConsole(variables)
-        shell.interact()
-
-        print()
-        self.current_room_intro()
-        return True
-
-    def use_phone(self):
-        print("This phone costs $ 0.25 cents to use.")
-        print("Who you gonna call? ", end="")
-        callees = dict(filter(lambda pair : pair[1].phoneable, AICharacter.get_all().items()))
-        print(list(callees.keys()))
-        callee = input("(input): ")
-        if callee in callees.keys():
-            if self.player.spend(0.25):
-                print("**RINGING**")
-                callees[callee].talk(phone=True)
-                print("\n*Thank you, call again.*")
-            else:
-                print("Come back with some quarters next time.")
-        else:
-            print("You can't call them.")
-        return True
-
-    def wear_wig(self):
-        wig = Item.get("wig")
-        if self.player.in_room_items(wig):
-            self.do_take("wig")
-
-        if wig in self.player.inv_items.values():
-            print("You put on the wig. Somehow it makes you look even weirder.")
-            self.player.wearing_wig = True
-            Entity.world.get("wig").droppable = False
-            return True
-        else:
-            print("Couldn't put wig in inventory")
-            raise OSError
-
-    def remove_wig(self):
-        print("You finally took that thing off?? It's about dang time, man...")
-        self.player.wearing_wig = False
-        Entity.world.get("wig").droppable = True
-        return True
-
-    def eat_old_hot_dog(self):
-        print("You somehow manage to choke down a 300 year old, all beef hot dog. Were it not for your well-lubricated esophagus, you would be dead right now. Let's hope you don't get food poisoning or become a zombified, hot dog person. Nasty.")
-        try:
-            self.player.inv_items.remove(Item.get('old hot dog'))
-        except:
-            pass
-        return Entity.purge('old hot dog')
-
-    def read_book(self):
-        print("You open the book to a random spot, and read this:\n")
-        os.system("fortune")
-        return True
-        
-    def lick_spoon(self):
-        print("Did you like that? Was it satisfying for you?")
-        return True
-        
-    def drink_hose(self):
-        print("You guzzle the brown stuff from the hose and tell yourself it was chocolate milk! Even as you bask in the glory of chocolate milk, your stomach gets very queasy. Then you throw up. Good job.")
-        return True
-
 if __name__ == '__main__':
-    Adventure.player = Character()
+    Adventure.player = Character(lookable=False)
     Adventure.game = Adventure(Adventure.player)
     Adventure.game.cmdloop()
