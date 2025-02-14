@@ -1,5 +1,6 @@
 cmd2
 openai
+pyyaml
 
 # Development dependencies
 pytest

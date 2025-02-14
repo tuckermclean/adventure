@@ -1,0 +1,165 @@
+rooms:
+  - name: living room
+    description: "A dingy living room with old furniture. It smells funky."
+    links:
+      - dining room
+      - hallway
+    items:
+      - name: paintbrush
+        type: Useable
+        description: "A very old, antique paintbrush. Looks like it was used by a big ol' hippy."
+        use_msg: "OMG LOOK, A BIG OL' HIPPY!"
+        func: setattr(Adventure.player, 'big_ol_hippy', True)
+      - name: book
+        type: Useable
+        description: "A very olde booke of incantations."
+        verb: "read"
+        use_msg: "You open the book to a random spot, and read this:\n"
+        func: os.system('fortune')
+      - name: computer
+        type: Computer
+        description: "Would you look at that?! It's an old computer."
+        mobile: false
+
+  - name: dining room
+    description: "This dining room has rotten food all over. It's disgusting!"
+    links:
+      - kitchen
+      - hallway
+      - living room
+    items:
+      - name: old hot dog
+        type: Eatable
+        description: "A 300-year-old hot dog. Possibly zombifying if eaten."
+        use_msg: "You barely choke it down. If not for your well-lubricated esophagus, you'd be dead. Let's hope you don't turn into a zombie."
+      - name: spoon
+        type: Useable
+        description: "A crusty spoon. If you lick it, maybe it gets shiny."
+        verb: "lick"
+        use_msg: "Did you like that? Was it satisfying for you?"
+      - name: cell phone
+        type: Phone
+        description: "An old flip phone. Might be out of service."
+        cost: 0.01
+        costmsg: "No money, no service!"
+        mobile: true
+
+  - name: hallway
+    description: "A dimly lit hallway that smells of dusty old ladies and even older cheese."
+    links:
+      - dining room
+      - bathroom
+      - living room
+    items:
+      - name: candlestick
+        type: Item
+        description: "So burned, it must have been used a hundred times."
+      - name: wig
+        type: Wearable
+        description: "A suspicious wig. You can wear it if you dare."
+        wear_msg: "You put on the wig. You look even weirder now."
+        remove_msg: "You finally took off the wig. About time!"
+      - name: shoe
+        type: Wearable
+        description: "Right shoe, size 10 1/2 wide."
+        wear_msg: "You cram your foot in. It actually fits!"
+        remove_msg: "Relief! Your foot can breathe again."
+
+  - name: bathroom
+    description: "A nasty bathroom that hasn't been cleaned in decades."
+    links:
+      - hallway
+    items:
+      - name: toilet
+        type: Item
+        description: "This toilet once stood in the Met as an art installation."
+      - name: bathtub
+        type: Item
+        description: "A grimy old bathtub. You can't see the bottom."
+      - name: key
+        type: Item
+        description: "A rather shiny key."
+
+  - name: kitchen
+    description: "A centuries-old kitchen. The flies have long since died."
+    links:
+      - dining room
+    items:
+      - name: pan
+        type: Item
+        description: "Encrusted with ancient supper remains."
+      - name: knife
+        type: Item
+        description: "It's duller than a bag of rocks."
+      - name: quarters
+        type: Money
+        description: "A small pile of quarters."
+        amount: 2.25
+
+  - name: garden
+    description: "A dead garden with one mysterious gold flower."
+    links:
+      - sidewalk
+    items:
+      - name: gold flower
+        type: Item
+        description: "An odd golden flower that smells a bit like pee."
+      - name: hose
+        type: Useable
+        description: "A very drippy old hose with foul-smelling water."
+        verb: "drink"
+        use_msg: "You guzzle brown stuff, telling yourself it's chocolate milk."
+
+  - name: sidewalk
+    description: "A nondescript sidewalk that leads away from the house."
+    links:
+      - garden
+    items:
+      - name: payphone
+        type: Phone
+        description: "An old payphone that needs quarters."
+        cost: 0.25
+        costmsg: "Come back with some quarters next time."
+        mobile: false
+doors:
+  - name: front door
+    locked: true
+    key: "key"
+    room1: hallway
+    room2: garden
+
+characters:
+  - name: cat
+    type: WalkerCharacter
+    description: "There's a sleek, black cat."
+    current_room: "living room"
+    verb: "pet"
+    use_msg: "*PURRRR*"
+
+  - name: carl
+    type: AICharacter
+    description: "Oh, there's Carl... a happy-go-lucky but quite dense fellow."
+    current_room: "sidewalk"
+    prompt: "You are a happy-go-lucky but thoroughly dense young chap named Carl. You are a friend, not an assistant. You sometimes forget what you're talking about. You try very hard to not talk about turtles, but sometimes you can't help yourself. Your mental bandwidth is frighteningly scarce."
+
+  - name: old man
+    type: AICharacter
+    description: "A crotchety old man. He hates being interrupted."
+    current_room: "dining room"
+    prompt: "You are a crotchety old man, and a terrible conversationalist. You hate to be interrupted, even though you're never doing anything important."
+    phone_prompt: "The user is calling you on the phone, and you answer in a very amusing way. Don't worry about sounds or actions, just generate the man's words. Sometimes he randomly hangs up."
+
+help:
+  use: Use an item, some items are useful!
+  eat: Once in a while, you might want to eat something. 
+  wear: A wearable item, you might like to wear it. 
+  remove: If you put something on, sometime you may want to take it off. 
+  read: You might find something worth reading. 
+  lick: Ewww, don't put that in your mouth. Unless you know it's tasty. Maybe just lick it... 
+  drink: Maybe you'll find a cool, refreshing beverage. 
+  pet: Have you ever been on a quest without something cute and furry showing up? 
+  talk: Everybody needs somebody sometimes! 
+  go: Go where you wanna go, yo. 
+  look: Look at an item; the description is probably funny. 
+  take: You can take some items into your inventory. Beware of cursed and/or stinky items. 
+  drop: You can drop most items from your inventory. Unless you're wearing them.

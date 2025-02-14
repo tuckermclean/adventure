@@ -1,5 +1,5 @@
 from __future__ import annotations
-import cmd2, code, os, random, re, shlex, sys
+import cmd2, code, os, random, re, shlex, sys, yaml
 from openai import OpenAI
 
 class EntityLinkException(Exception):
@@ -109,7 +109,7 @@ class Entity:
 Entity.world = Entity("world", "The world as we know it")
 
 class Item(Entity):
-    def __init__(self, name = 'item', description = "No description", droppable=True, takeable=True, lookable=True):
+    def __init__(self, name = 'item', description = "No description", droppable=True, takeable=True, lookable=True, **kwargs):
         Entity.__init__(self, name, description)
         self.droppable = droppable
         self.takeable = takeable
@@ -160,7 +160,7 @@ class Item(Entity):
 #class Phone(Item):
 
 class Money(Item):
-    def __init__(self, name="money", description="some money", amount=1.00):
+    def __init__(self, name="money", description="some money", amount=1.00, **kwargs):
         super().__init__(name, description, droppable=False)
         self.amount = amount
         self.add_action("take", self.take)
@@ -172,7 +172,7 @@ class Money(Item):
         return True
 
 class Wearable(Item):
-    def __init__(self, name="hat", description="A silly hat", wear_msg="You put on the hat.", remove_msg="You took off the hat."):
+    def __init__(self, name="hat", description="A silly hat", wear_msg="You put on the hat.", remove_msg="You took off the hat.", **kwargs):
         super().__init__(name, description, takeable=True, droppable=True)
         self.wear_msg = wear_msg
         self.remove_msg = remove_msg
@@ -204,9 +204,15 @@ class Wearable(Item):
 
 
 class Room(Entity):
-    def __init__(self, name='room', description = "An empty room"):
+    def __init__(self, name='room', description = "An empty room", **kwargs):
         super().__init__(name, description)
         self.add_action("go", self.go)
+        if 'links' in kwargs:
+            for link in kwargs['links']:
+                try:
+                    self.link_room(Room.get(link))
+                except NoEntityLinkException:
+                    pass
 
     def go(self):
         Adventure.player.current_room.pop(Adventure.player.name)
@@ -251,7 +257,7 @@ class Room(Entity):
         return actions
 
 class Door(Room):
-    def __init__(self, name: str, room1: Room, room2: Room, locked = True, key: Item = None):
+    def __init__(self, name: str, room1: Room, room2: Room, locked = True, key: Item = None, **kwargs):
         super().__init__(name, f"Door between {room1.name} and {room2.name}")
         super().link_room(room1)
         super().link_room(room2)
@@ -323,7 +329,7 @@ class Door(Room):
 
 class Useable(Item):
     def __init__(self, name="useful item", description="A useful item", takeable=True, droppable=True, verb="use",
-                 use_msg="So useful!", func=lambda: True):
+                 use_msg="So useful!", func=lambda: True, **kwargs):
         Item.__init__(self, name, description, takeable, droppable)
         self.use_msg = use_msg
         self.func = func
@@ -336,7 +342,7 @@ class Useable(Item):
     
 class Eatable(Useable):
     def __init__(self, name="food", description="A tasty item", takeable=True, droppable=True, verb="eat",
-                 use_msg="Yummy!", func=lambda: True):
+                 use_msg="Yummy!", func=lambda: True, **kwargs):
         super().__init__(name, description, takeable, droppable, verb, use_msg, func)
 
     def use(self):
@@ -349,7 +355,7 @@ class Eatable(Useable):
         return Entity.purge(self.name)
 
 class Phone(Useable):
-    def __init__(self, name="phone", description="An old phone", cost=0.25, costmsg="No service", mobile=False):
+    def __init__(self, name="phone", description="An old phone", cost=0.25, costmsg="No service", mobile=False, **kwargs):
         super().__init__(name=name, description=description, droppable=mobile, takeable=mobile)
         self.cost = cost
         self.costmsg = costmsg
@@ -375,7 +381,7 @@ class Phone(Useable):
         return True
 
 class Computer(Useable):
-    def __init__(self, name="computer", description="A computer", mobile=False):
+    def __init__(self, name="computer", description="A computer", mobile=False, **kwargs):
         super().__init__(name=name, description=description, droppable=mobile, takeable=mobile)
         self.add_action("use", self.use)
 
@@ -399,7 +405,7 @@ class Computer(Useable):
         return True
 
 class Character(Item):
-    def __init__(self, name="player", description="The main player", current_room=None, lookable=True):
+    def __init__(self, name="player", description="The main player", current_room=None, lookable=True, **kwargs):
         Item.__init__(self, name=name, description=description, droppable=False, takeable=False, lookable=lookable)
 
         self.current_room = None
@@ -453,7 +459,7 @@ class Character(Item):
 
 class WalkerCharacter(Character):
     def __init__(self, name="walker", description="Just walking around", current_room=None, lookable=True, verb="greet",
-                 use_msg="Hi!", func=lambda: True):
+                 use_msg="Hi!", func=lambda: True, **kwargs):
         Character.__init__(self, name=name, description=description, current_room=current_room, lookable=lookable)
         self.use_msg = use_msg
         self.func = func
@@ -503,7 +509,7 @@ class AICharacter(Character):
     def __init__(self, name="ai character", description="Some NPC", current_room=None,
                  prompt="You are a less-than helpful, yet amusing, assistant.",
                  phone_prompt=("The user is calling you on the phone, and you answer in an amusing way. "
-                               "Don't worry about sounds or actions, just generate the words.")):
+                               "Don't worry about sounds or actions, just generate the words."), **kwargs):
         super().__init__(name=name, description=description, current_room=current_room)
         self.phoneable = (phone_prompt != None)
         self.add_action("talk", self.talk)
@@ -593,143 +599,46 @@ class AICharacter(Character):
 
 
 class Adventure(cmd2.Cmd):
-    def __init__(self, player=None):
+    def __init__(self, player=None, file="world.yaml"):
         self.prompt = "> "
-        self.file = None
+        self.file = file
         
-        living_room = Room("living room", "A dingy living room with old furniture, yuck i hope someone cleans it")
-        dining_room = Room("dining room", "This dining room sucks. I think that's 100 year old food on the table")
-        kitchen = Room("kitchen", "This kitchen is so old and nasty, the flies died 50 years ago.")
-        hallway = Room("hallway", "A dimly lit hallway which smells of dusty, old ladies and roten cheese")
-        bathroom = Room("bathroom", "I really don't have to poop anymore, guys...")
-        garden = Room("garden", "a very dead garden,yuck and one mysterious gold flower")
-        sidewalk = Room("sidewalk", "It's not much to look at, but it gets your feet places.")
-
-        living_room.link_room(hallway)
-        living_room.link_room(dining_room)
-        hallway.link_room(dining_room)
-        hallway.link_room(bathroom)
-        dining_room.link_room(kitchen)
-        sidewalk.link_room(garden)
-            
-        paintbrush = Useable("paintbrush", "A very old, antique paintbrush. Looks like it was used by a big ol' hippy.",
-                             use_msg="OMG LOOK, A BIG OL' HIPPY!", func=lambda: setattr(Adventure.player, "big_ol_hippy", True))
-        pillow = Item("pillow", "this is so yellow my eyes could burn")
-        old_hot_dog = Eatable("old hot dog", "It has a weird little kink in it, like someone tried to bite it a long time ago.",
-                              use_msg=("You somehow manage to choke down a 300 year old, all beef hot dog. Were it not for your "
-                              "well-lubricated esophagus, you would be dead right now. Let's hope you don't get food poisoning "
-                              "or become a zombified, hot dog person. Nasty."))
-        spoon = Useable("spoon", "A little crusty, but if you lick it and wipe it on your shirt, it might get shiny.", verb="lick",
-                        use_msg="Did you like that? Was it satisfying for you?")
-        pan = Item("pan", "Encrusted with supper from long, long ago")
-        knife = Item("knife", "It's duller than a bag of rocks. Still, somebody will cut themselves with this.")
-        candlestick = Item("candlestick", "So burned I think someone has used this so many times")
-        wig = Wearable("wig", "This might have scabies; maybe I should not wear it",
-                       wear_msg="You put on the wig. Somehow it makes you look even weirder.",
-                       remove_msg="You finally took that thing off?? It's about dang time, man...")
-        shiny_knob = Item("shiny knob", "Honestly, this is the best thing you\'ve seen in your life im crying right now", takeable=False, droppable=False)
-        shoe = Wearable("shoe", "Right, 10 1/2 wide",
-                        wear_msg="You try like the most graceful of Cinderella's evil step-sisters to squeeze the shoe on your foot. You exclaim: \"IT FITS!\"",
-                        remove_msg="OH MY GOODNESS, FINALLY! Your foot throbs an aching cadence of relief.")
-        book = Useable("book", "A very olde booke of joke magical incantations.", verb="read",
-                       use_msg="You open the book to a random spot, and read this:\n", func=lambda: os.system("fortune"))
-        gold_flower = Item("gold flower", "An odd flower that's golden. It smells like pee.")
-        hose = Useable("hose", "A very drippy old hose. That water is brown, and what is that smell??", verb="drink",
-                       use_msg=("You guzzle the brown stuff from the hose and tell yourself it was chocolate milk! Even as "
-                                "you bask in the glory of chocolate milk, your stomach gets very queasy. Then you throw up. "
-                                "Good job."))
-        toilet = Item("toilet", "This toilet once stood as an art installation at the Metropolitan Museum of Art. Look at it now...")
-        bathtub = Item("bathtub", "Imagine the first person who sees you carrying this out of the house, just look at their face!")
-        computer = Computer("computer", "Would you look at that?! A computer! It looks really old, but it's running...", mobile=False)
-        payphone = Phone("payphone", "It's an old pay phone! You might need to get some change to make a call.", cost=0.25, costmsg="Come back with some quarters next time.")
-        cellphone = Phone("cell phone", "It's an old cell phone! I wonder if it has any service...", cost=0.01, costmsg="No money, no phone service!", mobile=True)
-        quarters = Money("quarters", "Oooh, a pile of quarters!", amount=2.25)
-        key = Item("key", "A rather shiny key")
-
-        front_door = Door("front door", hallway, garden, locked=True, key=key)
-
-        living_room.add_item(paintbrush)
-        living_room.add_item(book)
-        living_room.add_item(computer)
-        dining_room.add_item(old_hot_dog)
-        dining_room.add_item(spoon)
-        dining_room.add_item(cellphone)
-        kitchen.add_item(pan)
-        kitchen.add_item(knife)
-        kitchen.add_item(quarters)
-        hallway.add_item(candlestick)
-        hallway.add_item(wig)
-        hallway.add_item(shoe)
-        bathroom.add_item(toilet)
-        bathroom.add_item(bathtub)
-        bathroom.add_item(key)
-        garden.add_item(gold_flower)
-        garden.add_item(hose)
-        sidewalk.add_item(payphone)
-
-        if player == None:
-            self.player = Character()
+        # Load the world from a file
+        if os.path.exists(self.file):
+            with open(self.file, 'r') as stream:
+                try:
+                    world = yaml.safe_load(stream)
+                    for room in world['rooms']:
+                        Room(**room)
+                        for item in room['items']:
+                            # Return the item class based on the item type
+                            item_class = globals()[item['type']]
+                            if 'func' in item:
+                                def closure(func):
+                                    return lambda: eval(func)
+                                item['func'] = closure(item['func']) or True
+                            item_class(**item)
+                            Room.get(room['name']).add_item(item_class.get(item['name']))
+                    for door in world['doors']:
+                        door['room1'] = Room.get(door['room1'])
+                        door['room2'] = Room.get(door['room2'])
+                        door['key'] = Item.get(door['key'])
+                        Door(**door)
+                    for character in world['characters']:
+                        character_class = globals()[character['type']]
+                        character_class(**character)
+                        character_class.get(character['name']).go(Room.get(character['current_room']))
+                    for help in world['help']:
+                        text = world['help'][help]
+                        setattr(self, f"help_{help}", lambda text=text: print(text))
+                except yaml.YAMLError as exc:
+                    print(exc)
+            # Go to first room
+            Adventure.player.go(list(Room.get_all().values())[0])
         else:
-            self.player = player
-        self.player.go(Room.get("living room"))
-
-        cat = WalkerCharacter(name="cat", description="There's a cat, sleek and black.", current_room=Room.get("living room"),
-                              verb="pet", use_msg="*PURRRR*")
-
-        old_man = AICharacter(name="old man", description="There's a crotchety, old man. He doesn't seem to be in a good mood.", 
-                              prompt=("You are a crotchety old man, and a terrible conversationalist. You hate to be interrupted, "
-                                      "even though you're never doing anything important."),
-                              phone_prompt=("The user is calling you on the phone, and you answer in a very amusing way. Don't worry about "
-                                            "sounds or actions, just generate the man's words. Sometimes he randomly hangs up."))
-        kitchen.add_item(old_man)
-
-        carl = AICharacter(name="carl", description="Oh, there's Carl...",
-                           prompt=("You are a happy-go-lucky but thoroughly dense young chap named Carl. You are a friend, not an assistant. You "
-                                   "sometimes forget what you're talking about. You try very hard to not talk about turtles, but sometimes "
-                                   "you can't help yourself. Your mental bandwidth is frighteningly scarce."))
-        sidewalk.add_item(carl)
-
+            print("No world file found.")
 
         super().__init__()
-
-    def help_use(self):
-        print("Use an item, some items are useful!")
-
-    def help_eat(self):
-        print("Once in a while, you might want to eat something.")
-
-    def help_wear(self):
-        print("A wearable item, you might like to wear it.")
-
-    def help_remove(self):
-        print("If you put something on, sometime you may want to take it off.")
-
-    def help_read(self):
-        print("You might find something worth reading.")
-
-    def help_lick(self):
-        print("Ewww, don't put that in your mouth. Unless you know it's tasty. Maybe just lick it...")
-
-    def help_drink(self):
-        print("Maybe you'll find a cool, refreshing beverage.")
-
-    def help_pet(self):
-        print("Have you ever been on a quest without something cute and furry showing up?")
-
-    def help_talk(self):
-        print("Everybody needs somebody sometimes!")
-
-    def help_go(self):
-        print("Go where you wanna go, yo.")
-
-    def help_look(self):
-        print("Look at an item; the description is probably funny.")
-
-    def help_take(self):
-        print("You can take some items into your inventory. Beware of cursed and/or stinky items.")
-
-    def help_drop(self):
-        print("You can drop most items from your inventory. Unless you're wearing them.")
 
     def do_inv(self, arg=None):
         """List items in inventory"""
