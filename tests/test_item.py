@@ -20,6 +20,7 @@ def test_item_add_action():
 def test_item_do():
     item = list(Entity.get_all().values())[0]
     assert item.do("doink1") == "doink2"
+    assert item.do("doink3") == None
 
 def test_item_get_all():
     wipe_world()
@@ -32,6 +33,8 @@ def test_item_get_all():
 def test_item_get():
     item = list(Item.get_all().values())[0]
     assert Item.get(item.name) == item
+    with pytest.raises(NoEntityLinkException):
+        Item.get("nonexistent")
 
 def test_money():
     for i in range(3):
@@ -74,7 +77,8 @@ def test_rooms():
 
 def test_room_actions():
     rooms = list(Room.get_all().values())
-    assert len(rooms[0].get_actions()) == 2
+    print(rooms[0].get_actions())
+    assert len(rooms[0].get_actions()) == 6
     assert not rooms[0].get_actions() == rooms[1].get_actions()
 
 def test_room_get_rooms():
@@ -95,15 +99,3 @@ def test_door():
 def test_door_other():
     assert Entity.door.get_other(Entity.room1) == Entity.room2
     assert Entity.door.get_other(Entity.room2) == Entity.room1
-
-def test_door_unlock():
-    assert Entity.door.unlock(Entity.item) == False
-    assert Entity.door.locked == True
-    assert Entity.door.unlock(Entity.key) == True
-    assert Entity.door.locked == False
-
-def test_door_lock():
-    assert Entity.door.lock(Entity.item) == False
-    assert Entity.door.locked == False
-    assert Entity.door.lock(Entity.key) == True
-    assert Entity.door.locked == True

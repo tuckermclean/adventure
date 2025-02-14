@@ -1,5 +1,5 @@
 from __future__ import annotations
-import cmd2, code, os, random, re, shlex
+import cmd2, code, os, random, re, shlex, sys
 from openai import OpenAI
 
 class EntityLinkException(Exception):
@@ -143,12 +143,15 @@ class Item(Entity):
     def drop(self):
         """Drop an item from inventory"""
         if self in Adventure.player.inv_items.values():
-            del Adventure.player.inv_items[self.name]
-            Adventure.player.current_room.add_item(self)
-            self.remove_action("drop")
-            if self.takeable:
-                self.add_action("take", self.take)
-            Adventure.game.do_inv()
+            if self.droppable:
+                del Adventure.player.inv_items[self.name]
+                Adventure.player.current_room.add_item(self)
+                self.remove_action("drop")
+                if self.takeable:
+                    self.add_action("take", self.take)
+                Adventure.game.do_inv()
+            else:
+                print("That item is not droppable, guess you're stuck with it.")
         else:
             print("You don't have that item, dingus")
         return True
@@ -339,7 +342,8 @@ class Eatable(Useable):
     def use(self):
         super().use()
         try:
-            Adventure.player.inv_items.remove(self)
+            # Remove the item from the player's inventory
+            Adventure.player.inv_items.pop(self.name)
         except:
             pass
         return Entity.purge(self.name)

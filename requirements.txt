@@ -1,0 +1,6 @@
+cmd2
+openai
+
+# Development dependencies
+pytest
+coverage
