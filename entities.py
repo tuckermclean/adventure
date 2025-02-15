@@ -54,6 +54,8 @@ class Entity:
             return self.actions[action]()
         except KeyError:
             return None
+        except Exception as e:
+            print("Something went wrong during action:", action, e)
 
     def traverse(self, max_levels=-1, first_level=0, entities=None):
         if entities == None:

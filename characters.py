@@ -90,7 +90,7 @@ class OpenAIClient():
             OpenAIClient.client = OpenAI(api_key=api_key)
 
     @staticmethod
-    def get_or_create_assistant(name, instructions, model="gpt-3.5-turbo"):
+    def get_or_create_assistant(name, instructions, model="gpt-4-turbo"):
         # Check if the assistant already exists
         assistants = OpenAIClient.client.beta.assistants.list()
         for assistant in assistants.data:
@@ -108,9 +108,11 @@ class AICharacter(Character):
     def __init__(self, name="ai character", description="Some NPC", current_room=None,
                  prompt="You are a less-than helpful, yet amusing, assistant.",
                  phone_prompt=("The user is calling you on the phone, and you answer in an amusing way. "
-                               "Don't worry about sounds or actions, just generate the words."), **kwargs):
+                               "Don't worry about sounds or actions, just generate the words."),
+                 func=lambda json: print(f"Character returned: {json}"), **kwargs):
         super().__init__(name=name, description=description, current_room=current_room)
         self.phoneable = (phone_prompt != None)
+        self.func = func
         self.add_action("talk", self.talk)
 
         OpenAIClient.connect()
@@ -176,7 +178,10 @@ class AICharacter(Character):
             if run.status == 'completed': 
                 messages = OpenAIClient.client.beta.threads.messages.list(thread_id=thread.id)
                 print()
-                print(messages.data[0].content[0].text.value)
+                print(remove_triple_backticks(messages.data[0].content[0].text.value))
+                json_obj = find_json_objects(messages.data[0].content[0].text.value)
+                if json_obj:
+                    self.func(json_obj[0][0])
                 if re.search(hangups, messages.data[0].content[0].text.value.lower(), re.IGNORECASE) or re.search(hangups, last_input.lower(), re.IGNORECASE):
                     if not phone:
                         Entity.game.current_room_intro()
@@ -196,3 +201,42 @@ class AICharacter(Character):
                 content=last_input
             )
 
+def find_json_objects(text: str):
+    """
+    Tries to find and parse *all* JSON objects in `text` by scanning from left to right.
+    Returns a list of tuples (parsed_obj, start_index, end_index).
+    """
+    import json
+    decoder = json.JSONDecoder()
+    results = []
+
+    i = 0
+    n = len(text)
+
+    while i < n:
+        # Skip ahead until we see a '{' (or '[' if we also want arrays).
+        # If you're only expecting objects, scan for '{'—if arrays too, look for '[' as well.
+        if text[i] not in ['{', '[']:
+            i += 1
+            continue
+
+        try:
+            parsed_obj, end_index = decoder.raw_decode(text, i)
+            # If we get here, it successfully parsed a JSON object
+            results.append((parsed_obj, i, end_index))
+            i = end_index  # jump past this object
+        except json.JSONDecodeError:
+            i += 1  # not valid JSON here, move on
+
+    return results
+
+def remove_triple_backticks(text: str) -> str:
+    """
+    Removes all substrings enclosed by triple backticks (``` ... ```),
+    including the backticks themselves.
+
+    :param text: The original string that may contain triple-backtick blocks.
+    :return: The string with all triple-backtick blocks removed.
+    """
+    # DOTALL flag so '.' matches newlines as well
+    return re.sub(r'```.*?```', '', text, flags=re.DOTALL)

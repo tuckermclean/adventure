@@ -13,7 +13,7 @@ class Adventure(cmd2.Cmd):
         
         # Load the world from a file
         if os.path.exists(self.file):
-            with open(self.file, 'r') as stream:
+            with open(self.file, 'r', encoding="utf-8") as stream:
                 try:
                     world = yaml.safe_load(stream)
                     for room in world['rooms']:
@@ -23,7 +23,7 @@ class Adventure(cmd2.Cmd):
                             item_class = globals()[item['type']]
                             if 'func' in item:
                                 def closure(func):
-                                    return lambda: eval(func)
+                                    return lambda var=None: exec(func)
                                 item['func'] = closure(item['func']) or True
                             item_class(**item)
                             Room.get(room['name']).add_item(item_class.get(item['name']))
@@ -34,6 +34,10 @@ class Adventure(cmd2.Cmd):
                         Door(**door)
                     for character in world['characters']:
                         character_class = globals()[character['type']]
+                        if 'func' in character:
+                            def closure(func):
+                                return lambda var=None: exec(func)
+                            character['func'] = closure(character['func']) or True
                         character_class(**character)
                         character_class.get(character['name']).go(Room.get(character['current_room']))
                     for help in world['help']:
