@@ -1,6 +1,7 @@
 import pytest, string, random
 from adventure import *
 from helpers import *
+from entities import Entity, NoEntityLinkException
 
 def test_items():
     item1 = dummy(Item)

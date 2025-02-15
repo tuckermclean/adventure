@@ -1,6 +1,7 @@
 import pytest, random
 from adventure import *
 from helpers import *
+from entities import Entity, EntityLinkException
     
 def test_link():
     e1 = dummy()

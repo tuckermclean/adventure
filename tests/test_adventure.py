@@ -9,7 +9,7 @@ def test_make_world():
     """
     Adventure.player = Character(lookable=False)
     Adventure.game = Adventure(Adventure.player)
-    assert Adventure.game.player.current_room == Room.get("living room")
+    assert Adventure.game.player.current_room == list(Room.get_all().values())[0]
 
 def test_in_rooms():
     """
