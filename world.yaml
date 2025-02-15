@@ -1,7 +1,18 @@
 rooms:
+  - name: foyer
+    description: "A grand foyer with a high ceiling and a dusty chandelier. Footprints in the dust suggest recent activity."
+    links:
+      - living room
+      - library
+    items:
+      - name: doormat
+        type: Item
+        description: "A worn doormat that reads 'Welcome-ish'."
+
   - name: living room
     description: "A dingy living room with old furniture. It smells funky."
     links:
+      - foyer
       - dining room
       - hallway
     items:
@@ -50,6 +61,7 @@ rooms:
       - dining room
       - bathroom
       - living room
+      - library
     items:
       - name: candlestick
         type: Item
@@ -84,6 +96,7 @@ rooms:
     description: "A centuries-old kitchen. The flies have long since died."
     links:
       - dining room
+      - pantry
     items:
       - name: pan
         type: Item
@@ -95,6 +108,68 @@ rooms:
         type: Money
         description: "A small pile of quarters."
         amount: 2.25
+
+  - name: pantry
+    description: "A dark pantry lined with dusty cans and jars."
+    links:
+      - kitchen
+      - basement
+    items:
+      - name: flashlight
+        type: Useable
+        description: "An old flashlight, flickering occasionally."
+        verb: "toggle"
+        use_msg: "You give the flashlight a good smack and it turns on."
+      - name: moldy bread
+        type: Eatable
+        description: "Green fuzz covers the crust. Could be penicillin... or death."
+        use_msg: "You swallow a chunk. The taste is indescribable."
+
+  - name: basement
+    description: "A cold, damp basement. The walls are lined with strange markings."
+    links:
+      - pantry
+    items:
+      - name: basement key
+        type: Item
+        description: "Looks like it might unlock something else around here."
+      - name: old tapestry
+        type: Item
+        description: "A faded tapestry that depicts a knight fighting a dragon."
+      - name: rope
+        type: Item
+        description: "A sturdy rope. Maybe 10 feet long."
+
+  - name: library
+    description: "A quiet library filled with dusty tomes. A ladder on rails runs along massive bookshelves."
+    links:
+      - foyer
+      - hallway
+      - secret study
+    items:
+      - name: potion
+        type: Eatable
+        description: "A mysterious potion labeled 'Drink Me'."
+        use_msg: "You swallow the potion. You feel tingly all over..."
+      - name: ancient scroll
+        type: Useable
+        description: "A scroll with cryptic runes. Might hold a secret."
+        verb: "read"
+        use_msg: "Glowing letters briefly light up, then fade away."
+
+  - name: secret study
+    description: "A hidden room behind a sliding bookshelf. Strange contraptions fill the tables."
+    links:
+      - library
+    items:
+      - name: tower key
+        type: Item
+        description: "A key with a tower-shaped head."
+      - name: dusty journal
+        type: Useable
+        description: "Leather-bound notes on local legends."
+        verb: "read"
+        use_msg: "Each page crackles with age as you learn about ancient secrets."
 
   - name: garden
     description: "A dead garden with one mysterious gold flower."
@@ -114,6 +189,7 @@ rooms:
     description: "A nondescript sidewalk that leads away from the house."
     links:
       - garden
+      - tower
     items:
       - name: payphone
         type: Phone
@@ -121,12 +197,35 @@ rooms:
         cost: 0.25
         costmsg: "Come back with some quarters next time."
         mobile: false
+
+  - name: tower
+    description: "A towering spire that looms over the entire property. The wind howls ominously at the top."
+    links:
+      - sidewalk
+    items:
+      - name: telescope
+        type: Useable
+        description: "A large telescope. You can see for miles."
+        use_msg: "You peer through the lens, catching glimpses of distant hills."
+
 doors:
   - name: front door
     locked: true
     key: "key"
     room1: hallway
     room2: garden
+
+  - name: basement door
+    locked: true
+    key: "basement key"
+    room1: living room
+    room2: basement
+
+  - name: tower door
+    locked: true
+    key: "tower key"
+    room1: library
+    room2: tower
 
 characters:
   - name: cat
@@ -148,6 +247,19 @@ characters:
     current_room: "dining room"
     prompt: "You are a crotchety old man, and a terrible conversationalist. You hate to be interrupted, even though you're never doing anything important."
     phone_prompt: "The user is calling you on the phone, and you answer in a very amusing way. Don't worry about sounds or actions, just generate the man's words. Sometimes he randomly hangs up."
+
+  - name: alchemist
+    type: AICharacter
+    description: "A mysterious alchemist, always mumbling arcane recipes to himself."
+    current_room: "secret study"
+    prompt: "You are an eccentric alchemist obsessed with discovering new potions. You tend to speak in half-finished sentences and cryptic references to your experiments."
+
+  - name: raven
+    type: WalkerCharacter
+    description: "A sleek raven with glossy feathers, hopping about curiously."
+    current_room: "garden"
+    verb: "caw"
+    use_msg: "Caaaaw! It eyes you warily, then flutters away a few steps."
 
 help:
   use: Use an item, some items are useful!
