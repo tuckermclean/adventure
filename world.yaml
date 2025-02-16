@@ -26,7 +26,12 @@ rooms:
         description: "A very olde booke of incantations."
         verb: "read"
         use_msg: "You open the book to a random spot, and read this:\n"
-        func: os.system('fortune')
+        func: |
+          import subprocess, os
+          env = os.environ.copy()
+          if os.name == 'nt':
+            env['FORTUNE_PATH'] = 'C:\\Users\\me\\AppData\\Local\\Packages\\PythonSoftwareFoundation.Python.3.12_qbz5n2kfra8p0\\LocalCache\\local-packages\\share\\games\\fortune'
+          subprocess.run('fortune', env=env)
       - name: computer
         type: Computer
         description: "Would you look at that?! It's an old computer."
