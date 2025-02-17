@@ -54,11 +54,6 @@ class Adventure(cmd2.Cmd):
 
     def do_inv(self, arg=None):
         """List items in inventory"""
-        print("Items you have:", list(Entity.player.inv_items.keys()), " --  Money: $", '{:.2f}'.format(Entity.player.money))
-
-    def do_where(self, arg=None):
-        """Show current room info"""
-        self.current_room_intro()
 
     def do_exit(self, arg=None):
         """Quit the game"""
@@ -68,8 +63,9 @@ class Adventure(cmd2.Cmd):
         """Reset the game"""
         self.postloop()
         Entity.world = Entity("world")
-        Adventure.game = Adventure()
-        Adventure.game.cmdloop()
+        Entity.player = Character(lookable=False)
+        Entity.game = Adventure(Entity.player)
+        Entity.game.cmdloop()
 
     def postloop(self):
         return True
@@ -78,23 +74,74 @@ class Adventure(cmd2.Cmd):
         pass
 
     def completedefault(self, text, line, begidx, endidx):
-        command = shlex.split(line)
+        """
+        Provide custom tab-completion for adventure actions.
+        - Gracefully handles invalid commands or quotes.
+        - Returns partial matches for item names.
+        """
+
+        # Attempt to parse the line safely. If there's a mismatch in quotes,
+        # shlex.split() might raise a ValueError, so we fall back to a simpler approach.
         try:
-            item = command[1].lower()
-        except IndexError:
-            item = ""
-        action = command[0].lower()
-        items = []
-        for action_item in Entity.player.current_room.get_actions()[action]:
-            items.append(action_item.name)
-        return [i for i in items if i.startswith(item)]
+            tokens = shlex.split(line, posix=False)
+        except ValueError:
+            # Simple fallback if there are unbalanced quotes
+            # e.g. user typed: take "some item
+            tokens = line.strip().split()
+
+        if not tokens:
+            return []  # No tokens at all, no completions
+
+        # First token is the action, e.g. 'take', 'look', 'go'
+        action = tokens[0].lower()
+
+        # Attempt to isolate the partial item text
+        # If there's more than one token, treat the second as the item
+        if len(tokens) > 1:
+            # Strip leading/trailing quotes
+            item_partial = tokens[1].strip('"').strip("'").lower()
+        else:
+            item_partial = ""
+
+        # Get all possible actions from the current room
+        actions_dict = Entity.player.current_room.get_actions()
+        # e.g. { 'take': [<Item1>, <Item2>], 'look': [...], 'go': [...], ... }
+
+        # If the action doesn't exist, return empty
+        if action not in actions_dict:
+            return []
+
+        # Gather possible item names for this action
+        possible_items = [entity_item.name for entity_item in actions_dict[action]]
+
+        # Filter:
+        # 1) Must start with item_partial
+        # 2) Must NOT exactly equal item_partial (skip if already fully typed)
+        completions = [
+            item_name for item_name in possible_items
+            if item_name.lower().startswith(item_partial)
+            and item_name.lower() != item_partial
+        ]
+
+        # If user typed something like:
+        #   take "sho
+        # then text == '"sho' (starts with a quote but not ended).
+        # We'll auto-add a trailing quote to each completion for a nicer experience.
+        if text.startswith('"') and not text.endswith('"'):
+            # Make sure the user sees a final quote
+            completions = [c + '"' for c in completions]
+
+        return completions
 
     def get_all_commands(self):
-        return list(Entity.player.current_room.get_actions().keys()) + ['exit', 'help', 'inv', 'reset', 'where']
+        return list(Entity.player.current_room.get_actions().keys()) + ['exit', 'help', 'reset']
 
     def default(self, line):
         command = shlex.split(line.raw)
         try:
+            if command[0].lower() == "look" and len(command) == 1:
+                self.current_room_intro()
+                return
             item = Entity.get(command[1].lower())
             action = command[0].lower()
             if Entity.player.in_room_items(item) or item in Entity.player.inv_items.values():
@@ -111,6 +158,7 @@ class Adventure(cmd2.Cmd):
         print('You are in:', Entity.player.current_room.name.upper(), ' -- ', Entity.player.current_room.description)
         print('In this room, there are:', list(dict(filter(lambda pair : pair[1] != Entity.player, Entity.player.current_room.get_items().items())).keys()))
         print('The rooms next door:', list(Entity.player.current_room.get_rooms().keys()))
+        print("Items you have:", list(Entity.player.inv_items.keys()), " --  Money: $", '{:.2f}'.format(Entity.player.money))
         print()
         for char in dict(filter(lambda pair : Entity.player.in_room_items(pair[1]) and pair[1] != Entity.player, Character.get_all().items())).values():
             try:

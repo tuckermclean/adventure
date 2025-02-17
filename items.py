@@ -15,7 +15,7 @@ class Money(Item):
     def take(self):
         Entity.player.current_room.pop(self.name)
         Entity.player.money = Entity.player.money + self.amount
-        Entity.game.do_inv()
+        Entity.game.current_room_intro()
         return True
 
 class Wearable(Item):
