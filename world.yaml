@@ -1,6 +1,6 @@
 rooms:
   - name: foyer
-    description: "A grand foyer with a high ceiling and a dusty chandelier. Footprints in the dust suggest recent activity."
+    description: "A grand foyer with a high ceiling and a dusty whatever-it-is on the ceiling. Goofy footprints in the dust suggest recent paranormal activity."
     links:
       - living room
       - library
@@ -10,7 +10,7 @@ rooms:
         description: "A worn doormat that reads 'Welcome-ish'."
 
   - name: living room
-    description: "A dingy living room with old furniture. It smells funky."
+    description: "A dingy living room with old furniture. It smells like there was a puking party in here a while ago."
     links:
       - foyer
       - dining room
@@ -20,10 +20,10 @@ rooms:
         type: Useable
         description: "A very old, antique paintbrush. Looks like it was used by a big ol' hippy."
         use_msg: "OMG LOOK, A BIG OL' HIPPY!"
-        func: setattr(Adventure.player, 'big_ol_hippy', True)
+        func: setattr(Entity.player, 'big_ol_hippy', True)
       - name: book
         type: Useable
-        description: "A very olde booke of incantations."
+        description: "A very olde booke of whimsical apophthegms. It's a fortune cookie in book form."
         verb: "read"
         use_msg: "You open the book to a random spot, and read this:\n"
         func: |
@@ -46,8 +46,9 @@ rooms:
     items:
       - name: old hot dog
         type: Eatable
-        description: "A 300-year-old hot dog. Possibly zombifying if eaten."
-        use_msg: "You barely choke it down. If not for your well-lubricated esophagus, you'd be dead. Let's hope you don't turn into a zombie."
+        description: "A 300-year-old hot dog. Possibly zombifying if eaten. You've eaten a few dry-aged steaks in your time, but this is ridiculous."
+        use_msg: "You barely choke it down. If not for your well-lubricated esophagus, you'd be dead. You feel your DNA mutating. You might be a superhero now. Or a zombie. Or a zombie superhero."
+        func: setattr(Entity.player, 'mutant', True)
       - name: spoon
         type: Useable
         description: "A crusty spoon. If you lick it, maybe it gets shiny."
@@ -79,8 +80,8 @@ rooms:
       - name: shoe
         type: Wearable
         description: "Right shoe, size 10 1/2 wide."
-        wear_msg: "You cram your foot in. It actually fits!"
-        remove_msg: "Relief! Your foot can breathe again."
+        wear_msg: "You cram your foot in with all the might and muster of the prettiest of Cinderella's step sisters. OMG, It actually fits!"
+        remove_msg: "Relief! Your foot can breathe again. Your big toe might even stop throbbing."
 
   - name: bathroom
     description: "A nasty bathroom that hasn't been cleaned in decades."
@@ -88,14 +89,18 @@ rooms:
       - hallway
     items:
       - name: toilet
-        type: Item
-        description: "This toilet once stood in the Met as an art installation."
+        type: Useable
+        description: "This toilet once stood in the Met as an art installation. Now it's just a toilet. You're afraid to try the flush handle, but you know you want to."
+        verb: "flush"
+        use_msg: "You flush the toilet. It makes a sound like a dying whale. You're not sure if it's the toilet or the whale that's dying."
       - name: bathtub
-        type: Item
+        type: Useable
         description: "A grimy old bathtub. You can't see the bottom."
+        verb: "use"
+        use_msg: "You climb in and take a bath. It's not as bad as you thought, but it's not great either. You get out feeling a little greasier than when you went in."
       - name: key
         type: Item
-        description: "A rather shiny key."
+        description: "A rather shiny key. You might need it for something."
 
   - name: kitchen
     description: "A centuries-old kitchen. The flies have long since died."
@@ -111,7 +116,7 @@ rooms:
         description: "It's duller than a bag of rocks."
       - name: quarters
         type: Money
-        description: "A small pile of quarters."
+        description: "A small pile of quarters. I didn't say they were clean. Does George Washington look a little green to you?"
         amount: 2.25
 
   - name: pantry
@@ -124,11 +129,22 @@ rooms:
         type: Useable
         description: "An old flashlight, flickering occasionally."
         verb: "toggle"
-        use_msg: "You give the flashlight a good smack and it turns on."
+        func: |
+          if hasattr(var, 'power_on'):
+            if var.power_on:
+              var.power_on = False
+            else:
+              var.power_on = True
+          else:
+            setattr(var, 'power_on', True)
+          if var.power_on:
+            print("You flick the switch, give it a smack, and the flashlight comes on.")
+          else:
+            print("You switch off the flashlight, wondering if it will ever turn on again.")
       - name: moldy bread
         type: Eatable
         description: "Green fuzz covers the crust. Could be penicillin... or death."
-        use_msg: "You swallow a chunk. The taste is indescribable."
+        use_msg: "You swallow a chunk. The taste is indescribable. You feel a bit funny, but you're not sure if it's the bread or the situation."
 
   - name: basement
     description: "A cold, damp basement. The walls are lined with strange markings."
@@ -140,7 +156,7 @@ rooms:
         description: "Looks like it might unlock something else around here."
       - name: old tapestry
         type: Item
-        description: "A faded tapestry that depicts a knight fighting a dragon."
+        description: "A faded tapestry that depicts a knight fighting a dragon. The knight is losing. Badly. It's a bit sad, but also kind of funny. You start cheering for the dragon, but then you remember you're a human and you're supposed to like the knight. You feel conflicted."
       - name: rope
         type: Item
         description: "A sturdy rope. Maybe 10 feet long."
@@ -155,7 +171,17 @@ rooms:
       - name: potion
         type: Eatable
         description: "A mysterious potion labeled 'Drink Me'."
-        use_msg: "You swallow the potion. You feel tingly all over..."
+        verb: "drink"
+        use_msg: "*sip*"
+        func: |
+          if not hasattr(Entity.player, 'mutant'):
+            setattr(Entity.player, 'mutant', False)
+          if Entity.player.mutant:
+            print("You drink the potion, which feels quite bubbly and pleasant on your tongue. You feel a little more normal now. You're not sure if that's a good thing or not.")
+            Entity.player.mutant = False
+          else:
+            print("You drink the potion, which feels quite bubbly and pleasant on your tongue. You feel a little funny. You're not sure if that's a good thing or not.")
+
       - name: ancient scroll
         type: Useable
         description: "A scroll with cryptic runes. Might hold a secret."
@@ -188,7 +214,7 @@ rooms:
         type: Useable
         description: "A very drippy old hose with foul-smelling water."
         verb: "drink"
-        use_msg: "You guzzle brown stuff, telling yourself it's chocolate milk."
+        use_msg: "You guzzle brown stuff, telling yourself it's chocolate milk. It's not, but in your mind, it's deliciously gritty."
 
   - name: sidewalk
     description: "A nondescript sidewalk that leads away from the house."
@@ -206,12 +232,38 @@ rooms:
   - name: tower
     description: "A towering spire that looms over the entire property. The wind howls ominously at the top."
     links:
+      - library
       - sidewalk
     items:
-      - name: telescope
+      - name: doorbell
         type: Useable
-        description: "A large telescope. You can see for miles."
-        use_msg: "You peer through the lens, catching glimpses of distant hills."
+        description: "A doorbell that looks like it's never been rung."
+        verb: "ring"
+        use_msg: "*RAAAWWWRRR*"
+
+  - name: tower stairs
+    description: "A narrow, winding staircase that leads up to the tower."
+    links:
+      - balcony
+    items:
+      - name: spiderweb
+        type: Eatable
+        description: "A big, hairy spiderweb. It's sticky and gross."
+        use_msg: You pop the spiderweb into your mouth. It's sticky and gross, but you manage to swallow it. You wonder if you'll get superpowers now. Probably not. You're just gross.
+
+  - name: balcony
+    description: "A small balcony with a view of the garden and the tower."
+    links:
+      - tower stairs
+    items:
+      - name: binoculars
+        type: Useable
+        description: "A pair of binoculars. You can see even farther."
+        use_msg: "You scan the horizon, spying on the neighbors:"
+        takeable: false
+        func: |
+          from characters import OpenAIClient
+          print(OpenAIClient.oneoff_prompt("Briefly describe the present view of the neighborhood from a tall tower through binoculars. No need to mention the binoculars or the tower. The neighborhood is hilariously cursed. One or two punchy sentences, 30 words max."))
 
 doors:
   - name: front door
@@ -228,8 +280,8 @@ doors:
 
   - name: tower door
     locked: true
-    key: "tower key"
-    room1: library
+    key: tower key
+    room1: tower stairs
     room2: tower
 
 characters:
@@ -252,6 +304,14 @@ characters:
     current_room: "dining room"
     prompt: "You are a crotchety old man, and a terrible conversationalist. You hate to be interrupted, even though you're never doing anything important."
     phone_prompt: "The user is calling you on the phone, and you answer in a very amusing way. Don't worry about sounds or actions, just generate the man's words. Sometimes he randomly hangs up."
+
+  - name: spider
+    type: AICharacter
+    description: A big, hairy spider. It's just chilling. Identifies as "spider-bruh."
+    current_room: "tower stairs"
+    prompt: "You are a big, hairy spider. You're just chilling and you identify as 'spider-bruh'. You're not very talkative, but you're a good listener. You're also a bit of a philosopher, and you like to ponder the meaning of life and the nature of existence. You speak in short, simple sentences, and you're very chill."
+    phoneable: false
+    takeable: true
 
   - name: alchemist
     type: AICharacter
