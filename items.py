@@ -51,20 +51,21 @@ class Wearable(Item):
 
 class Useable(Item):
     def __init__(self, name="useful item", description="A useful item", takeable=True, droppable=True, verb="use",
-                 use_msg="So useful!", func=lambda: True, **kwargs):
+                 use_msg=None, func=lambda var=None: True, **kwargs):
         Item.__init__(self, name, description, takeable, droppable)
         self.use_msg = use_msg
         self.func = func
         self.add_action(verb, self.use)
 
     def use(self):
-        print(self.use_msg)
-        self.func()
+        if self.use_msg != None:
+            print(self.use_msg)
+        self.func(self)
         return True
     
 class Eatable(Useable):
     def __init__(self, name="food", description="A tasty item", takeable=True, droppable=True, verb="eat",
-                 use_msg="Yummy!", func=lambda: True, **kwargs):
+                 use_msg="Yummy!", func=lambda var=None: True, **kwargs):
         super().__init__(name, description, takeable, droppable, verb, use_msg, func)
 
     def use(self):

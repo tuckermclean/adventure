@@ -1,6 +1,6 @@
 from __future__ import annotations
 import random, re
-from openai import OpenAI
+import openai
 from entities import Room, Item, Entity, EntityLinkException
 
 class Character(Item):
@@ -87,7 +87,8 @@ class OpenAIClient():
     @staticmethod
     def connect(api_key=""):
         if OpenAIClient.client == None:
-            OpenAIClient.client = OpenAI(api_key=api_key)
+            OpenAIClient.client = openai.OpenAI(api_key=api_key)
+        openai.api_key = api_key
 
     @staticmethod
     def get_or_create_assistant(name, instructions, model="gpt-4-turbo"):
@@ -103,6 +104,16 @@ class OpenAIClient():
             model=model,
             instructions=instructions,
         )
+
+    @staticmethod
+    def oneoff_prompt(prompt, model="gpt-4-turbo"):
+        OpenAIClient.connect()
+        response = openai.chat.completions.create(
+            model=model,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.7
+        )
+        return response.choices[0].message.content
 
 class AICharacter(Character):
     def __init__(self, name="ai character", description="Some NPC", current_room=None,
