@@ -137,6 +137,7 @@ class Item(Entity):
 
     def look(self):
         print(self.name.upper(), " -- " , self.description)
+        print(f"Actions: {list(self.actions.keys())}")
         return True
 
     def take(self):

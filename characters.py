@@ -188,12 +188,18 @@ class AICharacter(Character):
             )
             if run.status == 'completed': 
                 messages = OpenAIClient.client.beta.threads.messages.list(thread_id=thread.id)
+                message = messages.data[0].content[0].text.value
+                message_stripped = replace_triple_backticks(message)
+                json_obj = find_json_objects(message)
                 print()
-                print(remove_triple_backticks(messages.data[0].content[0].text.value))
-                json_obj = find_json_objects(messages.data[0].content[0].text.value)
-                if json_obj:
-                    self.func(json_obj[0][0])
-                if re.search(hangups, messages.data[0].content[0].text.value.lower(), re.IGNORECASE) or re.search(hangups, last_input.lower(), re.IGNORECASE):
+                if len(json_obj) > 0:
+                    self.func(json_obj[0])
+                    print(replace_triple_backticks(message, f"{json_obj[0]['name'].upper()} -- {json_obj[0]['description']}"))
+                elif message_stripped != message and len(json_obj) < 1:
+                    print(f"ERROR: assistant provided object but it wasn't picked up:\n\n{message}")
+                else:
+                    print(message)
+                if re.search(hangups, message.lower(), re.IGNORECASE) or re.search(hangups, last_input.lower(), re.IGNORECASE):
                     if not phone:
                         Entity.game.current_room_intro()
                     return True
@@ -202,11 +208,11 @@ class AICharacter(Character):
 
             last_input = input("(input): ")
             if messages != None:
-                if re.search(hangups, messages.data[0].content[0].text.value.lower(), re.IGNORECASE) or re.search(hangups, last_input.lower(), re.IGNORECASE):
+                if re.search(hangups, message.lower(), re.IGNORECASE) or re.search(hangups, last_input.lower(), re.IGNORECASE):
                     if not phone:
                         Entity.game.current_room_intro()
                     return True
-            message = OpenAIClient.client.beta.threads.messages.create(
+            OpenAIClient.client.beta.threads.messages.create(
                 thread_id=thread.id,
                 role="user",
                 content=last_input
@@ -250,20 +256,20 @@ def find_json_objects(text: str):
         try:
             parsed_obj, end_index = decoder.raw_decode(text, i)
             # If we get here, it successfully parsed a JSON object
-            results.append((parsed_obj, i, end_index))
+            results.append(parsed_obj)
             i = end_index  # jump past this object
         except json.JSONDecodeError:
             i += 1  # not valid JSON here, move on
 
     return results
 
-def remove_triple_backticks(text: str) -> str:
+def replace_triple_backticks(text: str, replacement: str='') -> str:
     """
-    Removes all substrings enclosed by triple backticks (``` ... ```),
-    including the backticks themselves.
+    Replaces all substrings enclosed by triple backticks (``` ... ```) with a specified replacement string.
 
     :param text: The original string that may contain triple-backtick blocks.
-    :return: The string with all triple-backtick blocks removed.
+    :param replacement: The string to replace triple-backtick blocks with.
+    :return: The string with all triple-backtick blocks replaced.
     """
     # DOTALL flag so '.' matches newlines as well
-    return re.sub(r'```.*?```', '', text, flags=re.DOTALL)
+    return re.sub(r'```.*?```', replacement, text, flags=re.DOTALL)
