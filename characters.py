@@ -56,9 +56,9 @@ class Character(Item):
         else:
             print("WALKER", self.name, "GO", room.name, "DIDN'T WORK")
 
-class WalkerCharacter(Character):
-    def __init__(self, name="walker", description="Just walking around", current_room=None, lookable=True, verb="greet",
-                 use_msg="Hi!", func=lambda: True, **kwargs):
+class NonPlayerCharacter(Character):
+    def __init__(self, name="npc", description="Just hanging around", current_room=None, lookable=True, verb="greet",
+                 use_msg="Hi!", func=lambda var=None: True, **kwargs):
         Character.__init__(self, name=name, description=description, current_room=current_room, lookable=lookable)
         self.use_msg = use_msg
         self.func = func
@@ -66,8 +66,16 @@ class WalkerCharacter(Character):
     
     def use(self):
         print(self.use_msg)
-        self.func()
+        self.func(self)
         return True
+
+    def loopit(self):
+        pass
+
+class WalkerCharacter(NonPlayerCharacter):
+    def __init__(self, name="walker", description="Just walking around", current_room=None, lookable=True, verb="greet",
+                 use_msg="Hi!", func=lambda var=None: True, **kwargs):
+        NonPlayerCharacter.__init__(self, name=name, description=description, current_room=current_room, lookable=lookable, verb=verb, use_msg=use_msg, func=func)
 
     def loopit(self):
         try:

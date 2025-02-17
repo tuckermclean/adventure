@@ -2,7 +2,7 @@ from __future__ import annotations
 import cmd2, os, shlex, sys, yaml
 from entities import Room, Door, Item, Entity
 from items import Money, Wearable, Useable, Eatable, Computer, Phone
-from characters import Character, AICharacter, WalkerCharacter 
+from characters import Character, AICharacter, WalkerCharacter, NonPlayerCharacter
 
 class Adventure(cmd2.Cmd):
     def __init__(self, player=None, file="world.yaml"):
