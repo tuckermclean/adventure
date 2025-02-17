@@ -1,0 +1,307 @@
+rooms:
+  - name: village square
+    description: "A bustling, open square at the center of the village. Street performers, questionable food carts, and a faint smell of potatoes linger in the air."
+    links:
+      - shop
+      - tavern
+      - back alley
+      - forest road
+    items:
+      - name: fountain
+        type: Useable
+        description: "An ornate fountain spouting slightly murky water. Town rumor says tossing a coin in grants luck, but nobody looks lucky here."
+        verb: "toss"
+        use_msg: "You toss some water in the air. Nobody seems impressed."
+      - name: payphone
+        type: Phone
+        description: "A battered payphone perched strangely in the middle of the village square. Possibly the only phone around."
+        cost: 0.25
+        costmsg: "Out of quarters? Sorry, the phone won't budge."
+        mobile: false
+
+  - name: shop
+    description: "A cramped general store with shelves overflowing with odds and ends. A faint smell of mothballs permeates the stale air."
+    links:
+      - village square
+    items:
+      - name: silver coins
+        type: Money
+        description: "A small stack of tarnished silver coins. The shopkeeper won't mind if you borrow these, right?"
+        amount: 1.50
+      - name: dusty lantern
+        type: Useable
+        description: "An old brass lantern covered in dust. Might brighten your path if it still works."
+        verb: "light"
+        use_msg: "You strike the lantern. After some sputtering, it glows faintly."
+
+  - name: tavern
+    description: "A cozy, dimly lit tavern. Wooden tables, a roaring fireplace, and the scent of ale mix with boisterous chatter."
+    links:
+      - village square
+    items:
+      - name: tavern stew
+        type: Eatable
+        description: "A piping-hot bowl of stew, smelling of questionable meat and strong spices."
+        use_msg: "You slurp the stew. Tastes hearty, if a bit suspicious. You feel a warm fuzziness in your belly."
+
+  - name: back alley
+    description: "A narrow alleyway between tall, leaning buildings. Broken barrels and an old stray cat complete the picture."
+    links:
+      - village square
+    items:
+      - name: broken crate
+        type: Item
+        description: "A shattered wooden crate. It's empty, but might hide a roach or two."
+
+  - name: forest road
+    description: "A winding dirt road that meanders from the village square into the deeper forest. Lantern posts line the way, though most stand unlit."
+    links:
+      - village square
+      - forest clearing
+      - forest entrance
+    items:
+      - name: signpost
+        type: Item
+        description: "A wooden sign with faded lettering: 'Beware the forest beyond. Mystery abounds.'"
+
+  - name: forest entrance
+    description: "You stand at the threshold of a dense forest. Towering trees block out the sun, and the smell of moss is thick in the air."
+    links:
+      - forest road
+      - old oak clearing
+    items:
+      - name: warning sign
+        type: Item
+        description: "A tattered sign nailed to a tree: 'Enter at your own risk. The forest does not forgive foolish hearts.'"
+
+  - name: old oak clearing
+    description: "An ancient oak stands in the center. Its trunk is massive, and a rope swing dangles invitingly from a sturdy branch."
+    links:
+      - forest entrance
+      - enchanted pond
+    items:
+      - name: rope swing
+        type: Useable
+        description: "A simple rope tied to the thickest branch of the oak. It creaks when you put weight on it."
+        verb: "swing"
+        use_msg: "You hop onto the rope swing and push off. For a moment, you're a carefree child again."
+      - name: rare mushroom
+        type: Eatable
+        description: "A peculiar mushroom with swirling purple spots. It looks both delicious and dangerous."
+        use_msg: "You nibble the rare mushroom. A delightful tang tickles your palate, but you sense it might have mystical properties, too."
+        func: |
+          setattr(Entity.player, 'mushroom_insight', True)
+
+  - name: enchanted pond
+    description: "A shimmering pond reflecting the treetops and sky. Water lilies float serenely, occasionally bobbing with unseen fish below."
+    links:
+      - old oak clearing
+      - forest clearing
+      - deep forest path
+    items:
+      - name: sparkling stone
+        type: Item
+        description: "A small stone that catches the light just right, glinting with a silvery gleam."
+
+  - name: deep forest path
+    description: "A narrow footpath winding through towering evergreens. The sunlight barely reaches the mossy ground, and shadows dance in the breeze."
+    links:
+      - enchanted pond   # Or forest clearing, or old oak clearing—whichever best fits your world
+      - misty glen
+    items:
+      - name: hollow log
+        type: Useable
+        description: "A decaying log with a large hollow inside. Something might be lurking within."
+        verb: "inspect"
+        use_msg: "You peer into the log's damp interior. It's dark and smells like rotting leaves."
+
+  - name: misty glen
+    description: "A silent glen shrouded in fog. Pale light filters through the canopy, revealing wispy shapes that vanish when you look twice."
+    links:
+      - deep forest path
+      - fae circle
+    items:
+      - name: eerie lantern
+        type: Useable
+        description: "A ghostly lantern flickering blue. Strange runes adorn its rim."
+        verb: "light"
+        use_msg: "You try to light the lantern. A cold flame sputters to life, illuminating the fog with an otherworldly glow."
+
+  - name: fae circle
+    description: "A ring of ancient toadstools glowing faintly in the twilight. A soft chime resonates in the air, beckoning wanderers closer."
+    links:
+      - misty glen
+      - haunted grove
+    items:
+      - name: moonstone
+        type: Item
+        description: "A smooth, milky-white stone lying among the toadstools. It shines when touched by moonlight."
+
+  - name: haunted grove
+    description: "Twisted trees and gnarled roots give this grove a menacing aura. Faint whispers echo, though no one is visible. The air grows colder."
+    links:
+      - fae circle
+      - ancient ruin
+    items:
+      - name: whispering skull
+        type: Item
+        description: "An animal skull perched on a stump, faintly whispering incomprehensible words. You feel uneasy just being near it."
+
+  - name: ancient ruin
+    description: "Crumbled stone pillars and toppled statues hint at a lost civilization. Vines wrap around broken walls, nature reclaiming what was once grand."
+    links:
+      - haunted grove
+      - hidden waterfall
+    items:
+      - name: stone tablet
+        type: Useable
+        description: "A moss-covered tablet with faded carvings. Perhaps it tells a forgotten story."
+        verb: "read"
+        use_msg: "You brush away moss to reveal cryptic symbols. A story of heroes, monsters, and a final, tragic betrayal emerges in fragments."
+
+  - name: hidden waterfall
+    description: "A tumbling cascade of water concealed behind dense foliage. The spray cools the air, creating rainbows in dappled sunlight."
+    links:
+      - ancient ruin
+    items:
+      - name: sparkling fish
+        type: Item
+        description: "A small fish shimmering with rainbow scales. It leaps through the waterfall spray, impossible to catch by normal means."
+
+  - name: forest clearing
+    description: "A serene clearing in the woods, dappled with sunlight. Birds chirp overhead, and a gentle breeze rustles the leaves."
+    links:
+      - wizard's tower
+      - forest road
+      - enchanted pond
+    items: []
+
+  - name: wizard's tower
+    description: "A tall, crooked tower with arcane symbols etched into the stone walls. A faint hum of magical energy fills the air."
+    links:
+      - forest clearing
+    items:
+      - name: dusty tome
+        type: Useable
+        description: "A thick tome of archaic lore. The pages ruffle as if alive."
+        verb: "read"
+        use_msg: "The tome's letters swirl before your eyes, forming cryptic instructions and half-finished spells."
+
+  - name: secret hideout
+    description: "A hidden room under the alley, filled with contraband potions and bizarre contraptions. Strange runes glow on the walls."
+    links: []
+    items:
+      - name: forbidden potion
+        type: Eatable
+        description: "This neon-green concoction steams in its flask. You're not quite sure what's in it."
+        verb: "drink"
+        use_msg: "You gulp it down. You feel an intense rush of euphoria and dread... best not to dwell on it."
+      - name: loot
+        type: Money
+        description: "A little pile of gold doubloons. It's not yours, but who's counting?"
+        amount: 624.00
+      - name: tv
+        type: Item
+        description: "A dusty old TV set, flickering with static. It seems to be tuned to a channel of pure static."
+        verb: "watch"
+        use_msg: "You watch the static for a while. It's oddly soothing, in a disconcerting way."
+
+  - name: limbo
+    description: "A hidden limbo outside normal space, where unspawned items reside."
+    links: []
+    items:
+      - name: odd key
+        type: Item
+        description: "A swirling runic key conjured by the wizard. It glows slightly."
+        droppable: false
+        takeable: false
+        # Setting these to false ensures players can't interact with it directly yet.
+
+doors:
+  - name: hideout door
+    locked: true
+    key: "odd key"
+    room1: back alley
+    room2: secret hideout
+
+characters:
+  - name: wizard
+    type: NonPlayerCharacter
+    description: "An eccentric wizard with a long beard and glittering eyes. He seems both wise and scatterbrained. But mostly ego-driven."
+    current_room: "wizard's tower"
+    verb: "talk"
+    use_msg: null
+    func: |
+      import sys
+      has_mushroom = "rare mushroom" in Entity.player.inv_items
+      if hasattr(Entity.player, 'mushroom_insight'):
+          print('The wizard peers at you with a knowing look of disappointment. "You\'ve eaten my rare mushroom, haven\'t you? I can sense its essence on you. I\'m just so angry with you right now..."')
+      elif has_mushroom and not hasattr(var, 'has_mushroom'):
+          # We'll conjure an odd key
+          try:
+              Entity.player.inv_items["odd key"]
+              print("You already have the odd key. Why would you choose to hang out with the wizard? He's awful and really no fun at parties.")
+          except:
+              print("The wizard cackles: 'Aha, my beloved mushroom! Allow me to reward you...'")
+              Entity.purge("rare mushroom")
+              del Entity.player.inv_items["rare mushroom"]
+              setattr(var, 'has_mushroom', True)
+              from entities import Item
+              odd_key = Item.get("odd key")
+              try:
+                  # If 'limbo' room exists, pop 'odd key' from it.
+                  limbo = Room.get("limbo")
+                  limbo.pop("odd key")
+              except:
+                  # If it's not in limbo or 'limbo' doesn't exist, ignore.
+                  pass
+              # Now safely add it to the wizard's current room (or the player's current room)
+              Entity.player.current_room.add_item(odd_key)
+
+              # Optionally have the player "take" it automatically
+              odd_key.take()
+              odd_key.look()
+      elif hasattr(var, 'has_mushroom'):
+          print("You've already gotten your reward. Why would you want to hang out with the wizard? He's awful and really no fun at parties.")
+      elif not hasattr(var, "spoken_to_player"):
+          print("The wizard peers at you with a sour twinkle in his eye, as you factor into his plans. He calls to you, 'Greetings! I sense you have potential. But first, I must ask you to prove your worth. Bring me a rare mushroom, and we shall speak further.'")
+          setattr(var, "spoken_to_player", True)
+      else:
+          print("The wizard sniffs disdainfully: 'Still no mushroom? Come back when you've found it.'")
+
+  - name: stray dog
+    type: WalkerCharacter
+    description: "A hungry-looking stray dog that noses around for scraps."
+    current_room: "tavern"
+    verb: "feed"
+    use_msg: "You toss the dog a morsel of food. It gobbles it up happily, wagging its tail before wandering off."
+
+  - name: bartender
+    type: AICharacter
+    description: "A gruff bartender wiping glasses, muttering about the weather and bar fights."
+    current_room: "tavern"
+    prompt: "You are a gruff bartender, not easily impressed. You serve drinks and occasionally share local gossip, but only if the mood strikes. There's a weird wizard in town, but you don't trust him. He's been asking about a rare mushroom, of all things."
+    phone_prompt: ""
+    phoneable: false
+
+  - name: raven
+    type: WalkerCharacter
+    description: "A glossy-feathered raven hopping about, cawing cryptically."
+    current_room: "forest clearing"
+    verb: "caw"
+    use_msg: "Caaaaw! It fixes you with a beady eye, as though plotting something."
+
+help:
+  use: "Use an item. Some items need a specific verb, like 'light', 'ring', or 'flush'."
+  eat: "Mmm, tasty? Some items can be eaten. Just watch out for possible side effects!"
+  wear: "Wearable items can be worn. Why not accessorize?"
+  remove: "Remove a worn item. Fashion is fickle!"
+  read: "Try reading a book, scroll, or random graffiti. Who knows what secrets lie within?"
+  lick: "That's... kinda gross. But sure, if you must."
+  drink: "Refresh yourself or risk mutation. It's a gamble!"
+  pet: "Some creatures need a little affection. Or not. Good luck."
+  talk: "Converse with a character. They might have vital info... or nonsense."
+  go: "Travel from one room to another, if it's linked or accessible."
+  look: "Look at an item or your surroundings in more detail."
+  take: "Pick up an item and keep it in your inventory, if you're not maxed out."
+  drop: "Drop an item from your inventory. Sometimes you need to lighten your load."

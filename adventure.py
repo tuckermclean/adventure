@@ -7,7 +7,10 @@ from characters import Character, AICharacter, WalkerCharacter, NonPlayerCharact
 class Adventure(cmd2.Cmd):
     def __init__(self, player=None, file="world.yaml"):
         self.prompt = "> "
-        self.file = file
+        if len(sys.argv) > 1:
+            self.file = sys.argv[1]
+        else:
+            self.file = file
         Entity.set_game(self)
         Entity.set_player(player)
         

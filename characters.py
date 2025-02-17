@@ -65,7 +65,8 @@ class NonPlayerCharacter(Character):
         self.add_action(verb, self.use)
     
     def use(self):
-        print(self.use_msg)
+        if self.use_msg != None:
+            print(self.use_msg)
         self.func(self)
         return True
 
