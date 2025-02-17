@@ -52,7 +52,7 @@ class Wearable(Item):
 class Useable(Item):
     def __init__(self, name="useful item", description="A useful item", takeable=True, droppable=True, verb="use",
                  use_msg=None, func=lambda var=None: True, **kwargs):
-        Item.__init__(self, name, description, takeable, droppable)
+        Item.__init__(self, name, description, takeable=takeable, droppable=droppable)
         self.use_msg = use_msg
         self.func = func
         self.add_action(verb, self.use)
