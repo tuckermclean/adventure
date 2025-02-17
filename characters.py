@@ -178,7 +178,7 @@ class AICharacter(Character):
 
         messages = None
         last_input = ""
-        hangups = "bye|\*hangs up\*|\*click\*"
+        hangups = r"bye|\*hangs up\*|\*click\*"
 
         while messages == None or (not re.search(hangups, messages.data[0].content[0].text.value.lower(), re.IGNORECASE) and not re.search(hangups, last_input.lower(), re.IGNORECASE)):
 
@@ -211,6 +211,22 @@ class AICharacter(Character):
                 role="user",
                 content=last_input
             )
+
+    def add_to_prompt(self, new_instructions: str):
+        """
+        Insert a 'system' message into the existing thread,
+        effectively updating the context for subsequent calls.
+        """
+        if not hasattr(self, 'thread') or self.thread is None:
+            print("No active thread to update.")
+            return
+
+        # We create a new system message in the same thread
+        OpenAIClient.client.beta.threads.messages.create(
+            thread_id=self.thread.id,
+            role="user",
+            content=f"(System Update): {new_instructions}"
+        )
 
 def find_json_objects(text: str):
     """
