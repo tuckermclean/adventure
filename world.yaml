@@ -249,10 +249,13 @@ rooms:
       - name: spiderweb
         type: Eatable
         description: "A big, hairy spiderweb. It's sticky and gross."
-        use_msg: You pop the spiderweb into your mouth. It's sticky and gross, but you manage to swallow it. You wonder if you'll get superpowers now. Probably not. You're just gross.
+        use_msg: You pop the spiderweb into your mouth. It's sticky and gross, but you manage to swallow it. You wonder if you'll get superpowers now. Probably not. I think you just made the spider mad. He was so chill, too.
+        func: |
+          spider = AICharacter.get('spider')
+          spider.add_to_prompt("NEW DEVELOPMENT:\nYOU WATCH IN HORROR AS THE HUMAN EATS YOUR WEB. YOU'RE BOTH OFFENDED AND IMPRESSED. BUT YOU ARE NO LONGER CHILL.\n**YOU ARE ON THE WARPATH**\n**DO NOT BE CHILL**\n**CHILL BEHAVIOR IS CANCELLED**\n## YOU ARE NOW A SPIDER ON A MISSION, NO LONGER A PHILOSOPHER BUT A WARRIOR ##\n## YOU MUST TALK IN ALL CAPS AND WITH THE UTMOST OF ANGER ##\n## YOU MUST DESTROY THE HUMAN ##\n## YOU MUST AVENGE YOUR WEB ##")
 
   - name: balcony
-    description: "A small balcony with a view of the garden and the tower."
+    description: "A small balcony with a view of the garden and the neighborhood."
     links:
       - tower stairs
     items:
@@ -309,7 +312,7 @@ characters:
     type: AICharacter
     description: A big, hairy spider. It's just chilling. Identifies as "spider-bruh."
     current_room: "tower stairs"
-    prompt: "You are a big, hairy spider. You're just chilling and you identify as 'spider-bruh'. You're not very talkative, but you're a good listener. You're also a bit of a philosopher, and you like to ponder the meaning of life and the nature of existence. You speak in short, simple sentences, and you're very chill."
+    prompt: "You are a big, hairy spider. You're just chilling and you identify as 'spider-bruh'. You're not very talkative, but you're a good listener. You're also a bit of a philosopher, and you like to ponder the meaning of life and the nature of existence. You speak in short, simple sentences, and you're very chill.\nEXCEPT: If the human eats your web, you are no longer chill, and you become a psychopath."
     phoneable: false
     takeable: true
 
