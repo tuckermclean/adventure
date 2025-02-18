@@ -55,6 +55,7 @@ class Useable(Item):
         Item.__init__(self, name, description, takeable=takeable, droppable=droppable)
         self.use_msg = use_msg
         self.func = func
+        self.verb = verb
         self.add_action(verb, self.use)
 
     def use(self):

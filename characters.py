@@ -1,5 +1,5 @@
 from __future__ import annotations
-import random, re
+import random, re, os
 import openai
 from entities import Room, Item, Entity, EntityLinkException
 
@@ -94,7 +94,7 @@ class OpenAIClient():
     client = None
 
     @staticmethod
-    def connect(api_key=""):
+    def connect(api_key=os.getenv("OPENAI_API_KEY")):
         if OpenAIClient.client == None:
             OpenAIClient.client = openai.OpenAI(api_key=api_key)
         openai.api_key = api_key

@@ -1,38 +1,41 @@
 import pytest
 import random
-from adventure import *
+from adventure import Adventure
+from entities import Room, Door, Item, Entity
+from items import Money, Wearable, Useable, Eatable, Computer, Phone
+from characters import Character, AICharacter, WalkerCharacter, NonPlayerCharacter
 from helpers import *
 
 def test_make_world():
     """
     Simply instantiate the game and make sure the player is in the living room.
     """
-    Adventure.player = Character(lookable=False)
-    Adventure.game = Adventure(Adventure.player)
-    assert Adventure.game.player.current_room == list(Room.get_all().values())[0]
+    Entity.player = Character(lookable=False)
+    Entity.game = Adventure(Entity.player)
+    assert Entity.player.current_room == list(Room.get_all().values())[0]
 
 def test_in_rooms():
     """
     Check that a random adjacent room is recognized as "in_rooms".
     """
-    assert Adventure.game.player.in_rooms(
-        Room.get(random.choice(list(Adventure.game.player.current_room.get_rooms().keys())))
+    assert Entity.player.in_rooms(
+        Room.get(random.choice(list(Entity.player.current_room.get_rooms().keys())))
     )
 
 def test_in_room_items():
     """
     Check that a random item in the current room is recognized by in_room_items.
     """
-    assert Adventure.game.player.in_room_items(
-        Item.get(random.choice(list(Adventure.game.player.current_room.get_items().keys())))
+    assert Entity.player.in_room_items(
+        Item.get(random.choice(list(Entity.player.current_room.get_items().keys())))
     )
 
 def test_do_go():
     """
-    Instead of Adventure.game.do_go, call player.go(room) directly.
+    Instead of Entity.game.do_go, call player.go(room) directly.
     This ensures we are testing the actual movement logic, not cmd2.
     """
-    player = Adventure.game.player
+    player = Entity.player
     old_room = player.current_room
     assert player in old_room.get_items().values()  # player item is in old_room
 
@@ -51,11 +54,11 @@ def test_do_go():
 
 def test_do_unlock():
     """
-    Instead of Adventure.game.do_unlock(door.name), call door.unlock() directly.
+    Instead of Entity.game.do_unlock(door.name), call door.unlock() directly.
     """
     # pick a random Door object
     door = Door.get(random.choice(list(Door.get_all().keys())))
-    player = Adventure.game.player
+    player = Entity.player
 
     # Move the player into one of the rooms connected by this door
     # (check_link=False so we don't care if it's truly adjacent)
@@ -78,11 +81,11 @@ def test_do_unlock():
 
 def test_do_lock():
     """
-    Instead of Adventure.game.do_lock(door.name), call door.lock() directly.
+    Instead of Entity.game.do_lock(door.name), call door.lock() directly.
     """
     # pick a random Door object
     door = Door.get(random.choice(list(Door.get_all().keys())))
-    player = Adventure.game.player
+    player = Entity.player
 
     # Move the player into one of the rooms connected by this door
     # (check_link=False so we don't care if it's truly adjacent)
@@ -102,10 +105,10 @@ def test_do_lock():
 @pytest.mark.parametrize("num_to_take", [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16])
 def test_do_take(num_to_take):
     """
-    Instead of Adventure.game.do_take(itemName), directly call item.do("take").
+    Instead of Entity.game.do_take(itemName), directly call item.do("take").
     We check that the player cannot exceed max_items in inventory, etc.
     """
-    player = Adventure.game.player
+    player = Entity.player
     player.inv_items = {}  # clear inventory
     # Attempt to pick up items from every room until we've tried num_to_take
     count_taken = 0
@@ -171,10 +174,10 @@ def test_do_take(num_to_take):
 
 def test_do_drop():
     """
-    Instead of Adventure.game.do_drop(itemName), call item.do("drop") directly
+    Instead of Entity.game.do_drop(itemName), call item.do("drop") directly
     to test the drop logic.
     """
-    player = Adventure.game.player
+    player = Entity.player
 
     # For every item that is takeable and droppable (and not Money),
     # pick it up, drop it, etc.
@@ -218,7 +221,7 @@ def test_do_drop():
 def test_do_money_take():
     # Find a room that actually has money
     for room in filter(lambda r: any(isinstance(i, Money) for i in r.get_items().values()), Room.get_all().values()):
-        player = Adventure.game.player
+        player = Entity.player
         player.inv_items = {}  # clear inventory
         # move player to that room
         player.go(room, check_link=False)
@@ -232,7 +235,7 @@ def test_do_money_take():
 def test_do_wear_remove():
     # Find a room with a wearable item
     for room in filter(lambda r: any(isinstance(i, Wearable) for i in r.get_items().values()), Room.get_all().values()):
-        player = Adventure.game.player
+        player = Entity.player
         player.inv_items = {}  # clear inventory
         # move player to that room
         player.go(room, check_link=False)
@@ -253,7 +256,7 @@ def test_do_wear_remove():
 def test_do_eat():
     # Find a room with an edible item
     for room in filter(lambda r: any(isinstance(i, Eatable) for i in r.get_items().values()), Room.get_all().values()):
-        player = Adventure.game.player
+        player = Entity.player
         player.inv_items = {}  # clear inventory
         # move player to that room
         player.go(room, check_link=False)
@@ -265,9 +268,9 @@ def test_do_eat():
         assert edible.name in player.inv_items.keys()
 
         # Eat it
-        edible.do("eat")
+        edible.do(edible.verb)
         assert edible.name not in room.get_items().keys()
-        print(player.inv_items)
+        print(player.inv_items.keys())
         assert edible.name not in player.inv_items.keys()
 
         # Put it back in the room
@@ -275,6 +278,6 @@ def test_do_eat():
         assert edible.name in room.get_items().keys()
 
         # Eat it again
-        edible.do("eat")
+        edible.do(edible.verb)
         assert edible.name not in room.get_items().keys()
         assert edible.name not in player.inv_items.keys()
