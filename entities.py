@@ -150,7 +150,7 @@ class Item(Entity):
                 self.remove_action("take")
                 if self.droppable:
                     self.add_action("drop", self.drop)
-                Entity.game.do_inv()
+                self.look()
         else:
             print("That item is not in this room!")
         return True
@@ -164,7 +164,7 @@ class Item(Entity):
                 self.remove_action("drop")
                 if self.takeable:
                     self.add_action("take", self.take)
-                Entity.game.do_inv()
+                Entity.game.current_room_intro()
             else:
                 print("That item is not droppable, guess you're stuck with it.")
         else:

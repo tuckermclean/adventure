@@ -102,7 +102,7 @@ class Adventure(cmd2.Cmd):
         # If there's more than one token, treat the second as the item
         if len(tokens) > 1:
             # Strip leading/trailing quotes
-            item_partial = tokens[1].strip('"').strip("'").lower()
+            item_partial = " ".join(tokens[1:]).strip('"').strip("'").lower()
         else:
             item_partial = ""
 
@@ -141,19 +141,29 @@ class Adventure(cmd2.Cmd):
 
     def default(self, line):
         command = shlex.split(line.raw)
+        action = command[0].lower()
         try:
             if command[0].lower() == "look" and len(command) == 1:
                 self.current_room_intro()
                 return
-            item = Entity.get(command[1].lower())
-            action = command[0].lower()
+            try:
+                item_name = " ".join(command[1:]).lower().strip()
+            except Exception as e:
+                print(e)
+                item_name = None
+            if not item_name:
+                return
+            item = Entity.get(item_name)
             if Entity.player.in_room_items(item) or item in Entity.player.inv_items.values():
-                if not item.do(action):
-                    print("I don't know how to do that")
+                try:
+                    if not item.do(action):
+                        print(f"I don't know how to do '{action}' to '{item_name}'")
+                except Exception as e:
+                    print(f"I couldn't do '{action}' to '{item_name}': {type(e)}")
             else:
-                print("I don't know how to do that")
-        except:
-            print("I don't know how to do that")
+                print(f"I don't see that item here: {item_name}")
+        except Exception as e:
+            print(f"I couldn't do '{action}' to '{item_name}': {type(e)}")
         
     def current_room_intro(self):
         for char in dict(filter(lambda pair : Entity.player.in_room_items(pair[1]), Character.get_all().items())).values():

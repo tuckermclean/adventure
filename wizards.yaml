@@ -38,11 +38,7 @@ rooms:
     description: "A cozy, dimly lit tavern. Wooden tables, a roaring fireplace, and the scent of ale mix with boisterous chatter."
     links:
       - village square
-    items:
-      - name: tavern stew
-        type: Eatable
-        description: "A piping-hot bowl of stew, smelling of questionable meat and strong spices."
-        use_msg: "You slurp the stew. Tastes hearty, if a bit suspicious. You feel a warm fuzziness in your belly."
+    items: []
 
   - name: back alley
     description: "A narrow alleyway between tall, leaning buildings. Broken barrels and an old stray cat complete the picture."
@@ -189,7 +185,8 @@ rooms:
 
   - name: secret hideout
     description: "A hidden room under the alley, filled with contraband potions and bizarre contraptions. Strange runes glow on the walls."
-    links: []
+    links:
+      - catacombs
     items:
       - name: forbidden potion
         type: Eatable
@@ -201,24 +198,29 @@ rooms:
         description: "A little pile of gold doubloons. It's not yours, but who's counting?"
         amount: 624.00
       - name: tv
-        type: Item
+        type: Useable
         description: "A dusty old TV set, flickering with static. It seems to be tuned to a channel of pure static."
         verb: "watch"
         use_msg: "You watch the static for a while. It's oddly soothing, in a disconcerting way."
 
-  - name: limbo
-    description: "A hidden limbo outside normal space, where unspawned items reside."
-    links: []
+  - name: catacombs
+    description: "A labyrinth of ancient tunnels beneath the village. The air is thick with dust and the distant sound of dripping water."
+    links:
+      - secret hideout
     items:
-      - name: odd key
-        type: Item
-        description: "A swirling runic key conjured by the wizard. It glows slightly."
-        droppable: false
-        takeable: false
-        # Setting these to false ensures players can't interact with it directly yet.
+      - name: ancient sarcophagus
+        type: Useable
+        description: "A stone sarcophagus covered in cryptic carvings. It's sealed shut, but a faint glow emanates from within."
+        verb: "open"
+        use_msg: "You push the lid aside. A rush of cold air escapes, revealing a skeleton clutching a rusted sword."
+        func: |
+          from entities import Item
+          sword = Item("rusty sword", "A battered sword with a dull edge. It's seen better days.")
+          Entity.player.current_room.add_item(sword)
+          sword.take()
 
 doors:
-  - name: hideout door
+  - name: back door
     locked: true
     key: "odd key"
     room1: back alley
@@ -242,32 +244,19 @@ characters:
               Entity.player.inv_items["odd key"]
               print("You already have the odd key. Why would you choose to hang out with the wizard? He's awful and really no fun at parties.")
           except:
-              print("The wizard cackles: 'Aha, my beloved mushroom! Allow me to reward you...'")
-              Entity.purge("rare mushroom")
+              print('The wizard cackles: "Aha, my beloved mushroom! Allow me to reward you..."')
               del Entity.player.inv_items["rare mushroom"]
               setattr(var, 'has_mushroom', True)
               from entities import Item
-              odd_key = Item.get("odd key")
-              try:
-                  # If 'limbo' room exists, pop 'odd key' from it.
-                  limbo = Room.get("limbo")
-                  limbo.pop("odd key")
-              except:
-                  # If it's not in limbo or 'limbo' doesn't exist, ignore.
-                  pass
-              # Now safely add it to the wizard's current room (or the player's current room)
+              odd_key = Item("odd key", "A swirling runic key conjured by the wizard. It glows slightly.")
               Entity.player.current_room.add_item(odd_key)
-
-              # Optionally have the player "take" it automatically
-              odd_key.take()
-              odd_key.look()
       elif hasattr(var, 'has_mushroom'):
           print("You've already gotten your reward. Why would you want to hang out with the wizard? He's awful and really no fun at parties.")
       elif not hasattr(var, "spoken_to_player"):
-          print("The wizard peers at you with a sour twinkle in his eye, as you factor into his plans. He calls to you, 'Greetings! I sense you have potential. But first, I must ask you to prove your worth. Bring me a rare mushroom, and we shall speak further.'")
+          print('The wizard peers at you with a sour twinkle in his eye, as you factor into his plans. He calls to you, "Greetings! I sense you have potential. But first, I must ask you to prove your worth. Bring me a rare mushroom, and we shall speak further."')
           setattr(var, "spoken_to_player", True)
       else:
-          print("The wizard sniffs disdainfully: 'Still no mushroom? Come back when you've found it.'")
+          print('The wizard sniffs disdainfully: "Still no mushroom? Come back when you\'ve found it."')
 
   - name: stray dog
     type: WalkerCharacter
@@ -280,9 +269,45 @@ characters:
     type: AICharacter
     description: "A gruff bartender wiping glasses, muttering about the weather and bar fights."
     current_room: "tavern"
-    prompt: "You are a gruff bartender, not easily impressed. You serve drinks and occasionally share local gossip, but only if the mood strikes. There's a weird wizard in town, but you don't trust him. He's been asking about a rare mushroom, of all things."
-    phone_prompt: ""
-    phoneable: false
+    prompt: |
+      You are a gruff bartender, not easily impressed. You serve drinks and occasionally share local gossip, but only when you feel like it. You are a businessman, after all.
+
+      Here's the menu:
+
+      1. Tavern Stew: $ 2.50
+          It's made by your wife, so it's not half bad. Or is it? Sometimes she gets weird with the ingredients. Oh well, sell it anyway.
+      2. Ale: $ 1.00
+          The local brew, watered down for the tourists. They never notice.
+      3. Wine: $ 3.00
+          A dusty bottle from the back. It's probably vinegar by now. We'll call it 'aged.'
+      4. Whiskey: $ 5.00
+          The good stuff. Or at least, the stuff that's not watered down.
+      5. Information: $ 0.50
+          You've heard some things. Maybe you'll share, maybe you won't. It's all about the price.
+
+      When the customer orders something, generate a JSON object with the item, price, an amusing description, and a funny message for when the user eats or drinks it. Send it back to the player, within ``` triple backticks. If the payment fails, let the player know and finish with a courteous "bye" message.
+
+      Example:
+      ```
+      {"name": "Tavern Stew", "price": 2.50, "description": "A piping-hot bowl of stew, smelling of questionable meat and strong spices.", "use_msg": "You slurp the stew. Tastes hearty, if a bit suspicious. You feel a warm fuzziness in your belly."}
+      ```
+
+      Information is told directly to the player, without an item to take. The bartender will talk freely with the player once they've paid for information. Generate the JSON object as usual, but then tell the player the information directly. It's not a physical item, and it doesn't have a use_msg.
+
+      The main story about town is about the wizard and some rare mushroom. The wizard avoids town, but he's been seen in the forest. The mushroom is said to grant insight, but it's also rumored to be poisonous. The wizard so desperately wants it, he's willing to reward anyone who brings it to him.
+    func: |
+      print(f"BUY: {var['name']} for ${var['price']}")
+      if Entity.player.spend(var["price"]):
+        Character.get("bartender").add_to_prompt(f"New Customer Order: {var['name']} for ${var['price']}")
+        if var["name"] != "information":
+          if var["name"] != "Tavern Stew":
+            verb = "drink"
+          else:
+            verb = "eat"
+          item = Eatable(name=var["name"].lower(), description=var["description"], use_msg=var["use_msg"], verb=verb)
+          Entity.player.current_room.add_item(item)
+      else:
+        Character.get("bartender").add_to_prompt(f"Failed Customer Payment: {var['item']} for ${var['price']}")
 
   - name: raven
     type: WalkerCharacter
