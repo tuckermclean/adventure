@@ -81,12 +81,6 @@ rooms:
         description: "A simple rope tied to the thickest branch of the oak. It creaks when you put weight on it."
         verb: "swing"
         use_msg: "You hop onto the rope swing and push off. For a moment, you're a carefree child again."
-      - name: rare mushroom
-        type: Eatable
-        description: "A peculiar mushroom with swirling purple spots. It looks both delicious and dangerous."
-        use_msg: "You nibble the rare mushroom. A delightful tang tickles your palate, but you sense it might have mystical properties, too."
-        func: |
-          setattr(Entity.player, 'mushroom_insight', True)
 
   - name: enchanted pond
     description: "A shimmering pond reflecting the treetops and sky. Water lilies float serenely, occasionally bobbing with unseen fish below."
@@ -110,6 +104,12 @@ rooms:
         description: "A decaying log with a large hollow inside. Something might be lurking within."
         verb: "inspect"
         use_msg: "You peer into the log's damp interior. It's dark and smells like rotting leaves."
+      - name: rare mushroom
+        type: Eatable
+        description: "A peculiar mushroom with swirling purple spots. It looks both delicious and dangerous."
+        use_msg: "You nibble the rare mushroom. A delightful tang tickles your palate, but you sense it might have mystical properties, too."
+        func: |
+          setattr(Entity.player, 'mushroom_insight', True)
 
   - name: misty glen
     description: "A silent glen shrouded in fog. Pale light filters through the canopy, revealing wispy shapes that vanish when you look twice."
@@ -153,7 +153,27 @@ rooms:
         type: Useable
         description: "A moss-covered tablet with faded carvings. Perhaps it tells a forgotten story."
         verb: "read"
-        use_msg: "You brush away moss to reveal cryptic symbols. A story of heroes, monsters, and a final, tragic betrayal emerges in fragments."
+        func: |
+          if hasattr(Entity.player, 'mushroom_insight'):
+            print("You hold the moss-covered tablet. The words seem to shift and change, revealing a hidden message as the mushroom insight takes hold:\n")
+          elif hasattr(Entity.player, 'potion_insight'):
+            print("You hold the moss-covered tablet. The words seem to shift and change, revealing a hidden message as the potion insight takes hold:\n")
+          else:
+            print("You hold the moss-covered tablet. The words seem to shift and change, but you can't quite make them out.")
+          if hasattr(Entity.player, 'mushroom_insight') or hasattr(Entity.player, 'potion_insight'):
+            print("""The hero Arion, with silver eyes, traveled across distant mountains to slay monsters born from shadow. Alongside him walked his companion Selene—a woman of great wisdom, whose heart knew no fear.
+          
+          In forests of crystal, they faced the serpent Rimewyrm whose breath turned rivers into ice. Beneath crimson skies, they defeated the beast Dreamrender whose roar shattered dreams. Their legend grew with every victory, binding their fates tighter.
+          
+          Yet whispers foretold tragedy. A cursed mirror showed Arion glimpses of treachery, twisted reflections he refused to believe.
+          
+          In a ruined city cloaked in mist, they faced their final monster—the demon Malachor whose voice sowed seeds of doubt. Arion fought bravely, yet the whispers took root.
+          
+          In the decisive moment, his trusted companion Selene turned blade against him. Her tearful eyes revealed the demon Malachor's dark truth: to defeat evil forever required the sacrifice of goodness itself.
+          
+          He fell, betrayed but understanding, his silver eyes fading beneath a broken moon.
+          
+          Selene lingered alone among the ruins, a hero no longer, carrying the weight of a world saved but forever lost.""")
 
   - name: hidden waterfall
     description: "A tumbling cascade of water concealed behind dense foliage. The spray cools the air, creating rainbows in dappled sunlight."
@@ -161,8 +181,19 @@ rooms:
       - ancient ruin
     items:
       - name: sparkling fish
-        type: Item
+        type: Useable
         description: "A small fish shimmering with rainbow scales. It leaps through the waterfall spray, impossible to catch by normal means."
+        verb: "catch"
+        func: |
+          from items import Useable
+          if hasattr(Entity.player, 'mushroom_insight') or hasattr(Entity.player, 'potion_insight'):
+            print("You catch the shimmering fish. It wriggles in your hands, and you feel a surge of energy. The fish seems to whisper secrets of the forest.")
+            fish = Entity.player.current_room.pop("sparkling fish")
+            Entity.player.inv_items["sparkling fish"] = fish
+            fish.add_action("drop", fish.drop)
+          else:
+            print("You try to catch the shimmering fish, but it slips through your fingers. It seems to be laughing at you.")
+        takeable: False
 
   - name: forest clearing
     description: "A serene clearing in the woods, dappled with sunlight. Birds chirp overhead, and a gentle breeze rustles the leaves."
@@ -192,7 +223,9 @@ rooms:
         type: Eatable
         description: "This neon-green concoction steams in its flask. You're not quite sure what's in it."
         verb: "drink"
-        use_msg: "You gulp it down. You feel an intense rush of euphoria and dread... best not to dwell on it."
+        use_msg: "You gulp it down. You feel an intense rush of euphoria and dread... best not to dwell on it. You also feel a twinge of insight."
+        func: |
+          setattr(Entity.player, 'potion_insight', True)
       - name: loot
         type: Money
         description: "A little pile of gold doubloons. It's not yours, but who's counting?"
@@ -208,16 +241,279 @@ rooms:
     links:
       - secret hideout
     items:
-      - name: ancient sarcophagus
+      - name: sarcophagus
         type: Useable
         description: "A stone sarcophagus covered in cryptic carvings. It's sealed shut, but a faint glow emanates from within."
         verb: "open"
-        use_msg: "You push the lid aside. A rush of cold air escapes, revealing a skeleton clutching a rusted sword."
         func: |
           from entities import Item
-          sword = Item("rusty sword", "A battered sword with a dull edge. It's seen better days.")
-          Entity.player.current_room.add_item(sword)
-          sword.take()
+          if hasattr(Entity.player, 'mutant'):
+            print("You heave open the sarcophagus with your mutant, brute strength. A skeleton lies within, clutching a rusted sword. It seems to be waiting for something.")
+            sword = Item("rusty sword", "A battered sword with a dull edge. It's seen better days.")
+            Entity.player.current_room.add_item(sword)
+            Entity.game.current_room_intro()
+          else:
+            print("You try to open the sarcophagus, but it's stuck. You might need some help.")
+          
+  - name: spooky house
+    description: "A weirdly spooky, hilariously cursed house. Rumor has it an eccentric alchemist lives here. The front door has a weird, fish-shaped lock."
+    links:
+      - garden
+      - old oak clearing
+    items:
+      - name: doormat
+        type: Item
+        description: "A worn doormat that reads 'Welcome-ish'."
+
+  - name: foyer
+    description: "A grand foyer with a high ceiling and a dusty whatever-it-is on the ceiling. Goofy footprints in the dust suggest recent paranormal activity."
+    links:
+      - living room
+      - library
+    items: []
+
+  - name: living room
+    description: "A dingy living room with old furniture. It smells like there was a puking party in here a while ago."
+    links:
+      - foyer
+      - dining room
+      - hallway
+    items:
+      - name: paintbrush
+        type: Useable
+        description: "A very old, antique paintbrush. Looks like it was used by a big ol' hippy."
+        use_msg: "OMG LOOK, A BIG OL' HIPPY!"
+        func: setattr(Entity.player, 'big_ol_hippy', True)
+      - name: book
+        type: Useable
+        description: "A very olde booke of whimsical apophthegms. It's a fortune cookie in book form."
+        verb: "read"
+        use_msg: "You open the book to a random spot, and read this:\n"
+        func: |
+          import subprocess, os
+          env = os.environ.copy()
+          if os.name == 'nt':
+            env['FORTUNE_PATH'] = 'C:\\Users\\me\\AppData\\Local\\Packages\\PythonSoftwareFoundation.Python.3.12_qbz5n2kfra8p0\\LocalCache\\local-packages\\share\\games\\fortune'
+          subprocess.run('fortune', env=env)
+      - name: computer
+        type: Computer
+        description: "Would you look at that?! It's an old computer."
+        mobile: false
+
+  - name: dining room
+    description: "This dining room has rotten food all over. It's disgusting!"
+    links:
+      - kitchen
+      - hallway
+      - living room
+    items:
+      - name: old hot dog
+        type: Eatable
+        description: "A 300-year-old hot dog. Possibly zombifying if eaten. You've eaten a few dry-aged steaks in your time, but this is ridiculous."
+        use_msg: "You barely choke it down. If not for your well-lubricated esophagus, you'd be dead. You feel your DNA mutating. You might be a superhero now. Or a zombie. Or a zombie superhero. You now have brute strength, and you look horrendous."
+        func: setattr(Entity.player, 'mutant', True)
+      - name: spoon
+        type: Useable
+        description: "A crusty spoon. If you lick it, maybe it gets shiny."
+        verb: "lick"
+        use_msg: "Did you like that? Was it satisfying for you?"
+      - name: cell phone
+        type: Phone
+        description: "An old flip phone. Might be out of service."
+        cost: 0.01
+        costmsg: "No money, no service!"
+        mobile: true
+
+  - name: hallway
+    description: "A dimly lit hallway that smells of dusty old ladies and even older cheese."
+    links:
+      - dining room
+      - bathroom
+      - living room
+      - library
+    items:
+      - name: candlestick
+        type: Item
+        description: "So burned, it must have been used a hundred times."
+      - name: wig
+        type: Wearable
+        description: "A suspicious wig. You can wear it if you dare."
+        wear_msg: "You put on the wig. You look even weirder now."
+        remove_msg: "You finally took off the wig. About time!"
+      - name: shoe
+        type: Wearable
+        description: "Right shoe, size 10 1/2 wide."
+        wear_msg: "You cram your foot in with all the might and muster of the prettiest of Cinderella's step sisters. OMG, It actually fits!"
+        remove_msg: "Relief! Your foot can breathe again. Your big toe might even stop throbbing."
+
+  - name: bathroom
+    description: "A nasty bathroom that hasn't been cleaned in decades."
+    links:
+      - hallway
+    items:
+      - name: toilet
+        type: Useable
+        description: "This toilet once stood in the Met as an art installation. Now it's just a toilet. You're afraid to try the flush handle, but you know you want to."
+        verb: "flush"
+        use_msg: "You flush the toilet. It makes a sound like a dying whale. You're not sure if it's the toilet or the whale that's dying."
+      - name: bathtub
+        type: Useable
+        description: "A grimy old bathtub. You can't see the bottom."
+        verb: "use"
+        use_msg: "You climb in and take a bath. It's not as bad as you thought, but it's not great either. You get out feeling a little greasier than when you went in."
+      - name: key
+        type: Item
+        description: "A rather shiny key. You might need it for something."
+
+  - name: kitchen
+    description: "A centuries-old kitchen. The flies have long since died."
+    links:
+      - dining room
+      - pantry
+    items:
+      - name: pan
+        type: Item
+        description: "Encrusted with ancient supper remains."
+      - name: knife
+        type: Item
+        description: "It's duller than a bag of rocks."
+      - name: quarters
+        type: Money
+        description: "A small pile of quarters. I didn't say they were clean. Does George Washington look a little green to you?"
+        amount: 2.25
+
+  - name: pantry
+    description: "A dark pantry lined with dusty cans and jars."
+    links:
+      - kitchen
+      - basement
+    items:
+      - name: flashlight
+        type: Useable
+        description: "An old flashlight, flickering occasionally."
+        verb: "toggle"
+        func: |
+          if hasattr(var, 'power_on'):
+            if var.power_on:
+              var.power_on = False
+            else:
+              var.power_on = True
+          else:
+            setattr(var, 'power_on', True)
+          if var.power_on:
+            print("You flick the switch, give it a smack, and the flashlight comes on.")
+          else:
+            print("You switch off the flashlight, wondering if it will ever turn on again.")
+      - name: moldy bread
+        type: Eatable
+        description: "Green fuzz covers the crust. Could be penicillin... or death."
+        use_msg: "You swallow a chunk. The taste is indescribable. You feel a bit funny, but you're not sure if it's the bread or the situation."
+
+  - name: basement
+    description: "A cold, damp basement. The walls are lined with strange markings."
+    links:
+      - pantry
+    items:
+      - name: basement key
+        type: Item
+        description: "Looks like it might unlock something else around here."
+      - name: old tapestry
+        type: Item
+        description: "A faded tapestry that depicts a knight fighting a dragon. The knight is losing. Badly. It's a bit sad, but also kind of funny. You start cheering for the dragon, but then you remember you're a human and you're supposed to like the knight. You feel conflicted."
+      - name: rope
+        type: Item
+        description: "A sturdy rope. Maybe 10 feet long."
+
+  - name: library
+    description: "A quiet library filled with dusty tomes. A ladder on rails runs along massive bookshelves."
+    links:
+      - foyer
+      - hallway
+      - secret study
+    items:
+      - name: antidote potion
+        type: Eatable
+        description: "A mysterious potion labeled 'Drink In Case of Mutancy'."
+        verb: "drink"
+        use_msg: "*sip*"
+        func: |
+          if hasattr(Entity.player, 'mutant'):
+            print("You drink the potion, which feels quite bubbly and pleasant on your tongue. You feel a little more normal now. You're not sure if that's a good thing or not.")
+            delattr(Entity.player, 'mutant')
+          else:
+            print("You drink the potion, which feels quite bubbly and pleasant on your tongue. You feel a little funny. You're not sure if that's a good thing or not.")
+
+      - name: ancient scroll
+        type: Useable
+        description: "A scroll with cryptic runes. Might hold a secret."
+        verb: "read"
+        use_msg: "Glowing letters briefly light up, then fade away."
+
+  - name: secret study
+    description: "A hidden room behind a sliding bookshelf. Strange contraptions fill the tables."
+    links:
+      - library
+    items:
+      - name: tower key
+        type: Item
+        description: "A key with a tower-shaped head."
+      - name: dusty journal
+        type: Useable
+        description: "Leather-bound notes on local legends."
+        verb: "read"
+        use_msg: "Each page crackles with age as you learn about ancient secrets."
+
+  - name: garden
+    description: "A dead garden with one mysterious gold flower."
+    links:
+      - spooky house
+    items:
+      - name: gold flower
+        type: Item
+        description: "An odd golden flower that smells a bit like pee."
+      - name: hose
+        type: Useable
+        description: "A very drippy old hose with foul-smelling water."
+        verb: "drink"
+        use_msg: "You guzzle brown stuff, telling yourself it's chocolate milk. It's not, but in your mind, it's deliciously gritty."
+
+  - name: tower
+    description: "A towering spire that looms over the entire property. The wind howls ominously at the top."
+    links:
+      - library
+    items:
+      - name: doorbell
+        type: Useable
+        description: "A doorbell that looks like it's never been rung."
+        verb: "ring"
+        use_msg: "*RAAAWWWRRR*"
+
+  - name: tower stairs
+    description: "A narrow, winding staircase that leads up to the tower."
+    links:
+      - balcony
+    items:
+      - name: spiderweb
+        type: Eatable
+        description: "A big, hairy spiderweb. It's sticky and gross."
+        use_msg: You pop the spiderweb into your mouth. It's sticky and gross, but you manage to swallow it. You wonder if you'll get superpowers now. Probably not. I think you just made the spider mad. He was so chill, too.
+        func: |
+          spider = AICharacter.get('spider')
+          spider.add_to_prompt("NEW DEVELOPMENT:\nYOU WATCH IN HORROR AS THE HUMAN EATS YOUR WEB. YOU'RE BOTH OFFENDED AND IMPRESSED. BUT YOU ARE NO LONGER CHILL.\n**YOU ARE ON THE WARPATH**\n**DO NOT BE CHILL**\n**CHILL BEHAVIOR IS CANCELLED**\n## YOU ARE NOW A SPIDER ON A MISSION, NO LONGER A PHILOSOPHER BUT A WARRIOR ##\n## YOU MUST TALK IN ALL CAPS AND WITH THE UTMOST OF ANGER ##\n## YOU MUST DESTROY THE HUMAN ##\n## YOU MUST AVENGE YOUR WEB ##")
+
+  - name: balcony
+    description: "A small balcony with a view of the forest and the wizard's tower."
+    links:
+      - tower stairs
+    items:
+      - name: binoculars
+        type: Useable
+        description: "A pair of binoculars. You can see even farther."
+        use_msg: "You scan the horizon, spying on the neighbors:"
+        takeable: false
+        func: |
+          from characters import OpenAIClient
+          print(OpenAIClient.oneoff_prompt("Briefly describe the present view of a hilariously cursed, mystical forest from a tall tower through binoculars. No need to mention the binoculars or the tower. Over the treetops, you can see the wizard's tower. He's usually doing something ridiculous. One or two punchy sentences, 30 words max."))
 
 doors:
   - name: back door
@@ -225,6 +521,24 @@ doors:
     key: "odd key"
     room1: back alley
     room2: secret hideout
+
+  - name: front door
+    locked: true
+    key: "sparkling fish"
+    room1: foyer
+    room2: spooky house
+
+  - name: basement door
+    locked: true
+    key: "basement key"
+    room1: living room
+    room2: basement
+
+  - name: tower door
+    locked: true
+    key: tower key
+    room1: tower stairs
+    room2: tower
 
 characters:
   - name: wizard
@@ -236,27 +550,34 @@ characters:
     func: |
       import sys
       has_mushroom = "rare mushroom" in Entity.player.inv_items
-      if hasattr(Entity.player, 'mushroom_insight'):
-          print('The wizard peers at you with a knowing look of disappointment. "You\'ve eaten my rare mushroom, haven\'t you? I can sense its essence on you. I\'m just so angry with you right now..."')
-      elif has_mushroom and not hasattr(var, 'has_mushroom'):
-          # We'll conjure an odd key
-          try:
-              Entity.player.inv_items["odd key"]
-              print("You already have the odd key. Why would you choose to hang out with the wizard? He's awful and really no fun at parties.")
-          except:
-              print('The wizard cackles: "Aha, my beloved mushroom! Allow me to reward you..."')
-              del Entity.player.inv_items["rare mushroom"]
-              setattr(var, 'has_mushroom', True)
-              from entities import Item
-              odd_key = Item("odd key", "A swirling runic key conjured by the wizard. It glows slightly.")
-              Entity.player.current_room.add_item(odd_key)
-      elif hasattr(var, 'has_mushroom'):
-          print("You've already gotten your reward. Why would you want to hang out with the wizard? He's awful and really no fun at parties.")
-      elif not hasattr(var, "spoken_to_player"):
-          print('The wizard peers at you with a sour twinkle in his eye, as you factor into his plans. He calls to you, "Greetings! I sense you have potential. But first, I must ask you to prove your worth. Bring me a rare mushroom, and we shall speak further."')
-          setattr(var, "spoken_to_player", True)
+      if hasattr(Entity.player, 'mutant'):
+          print("The wizard looks at you with an astonished look: \"My oh my, aren't you ugly! I haven't seen a mutant like you in ages. I like your drip G! You should be a model!\"")
+      elif hasattr(Entity.player, 'potion_insight'):
+          print("The wizard peers at you with a knowing look. \"I must say, you have a certain... je ne sais quoi. You haven't taken any weird potions, have you?\"")
       else:
-          print('The wizard sniffs disdainfully: "Still no mushroom? Come back when you\'ve found it."')
+          if hasattr(Entity.player, 'mushroom_insight'):
+              print('The wizard peers at you with a knowing look of disappointment. "You\'ve eaten my rare mushroom, haven\'t you? I can sense its essence on you. I\'m just so angry with you right now..."')
+          elif has_mushroom and not hasattr(var, 'has_mushroom'):
+              # We'll conjure an odd key
+              try:
+                  Entity.player.inv_items["odd key"]
+                  print("You already have the odd key. Why would you choose to hang out with the wizard? He's awful and really no fun at parties.")
+              except:
+                  print('The wizard cackles: "Aha, my beloved mushroom! Allow me to reward you..."')
+                  del Entity.player.inv_items["rare mushroom"]
+                  setattr(var, 'has_mushroom', True)
+                  from entities import Item
+                  odd_key = Item("odd key", "A swirling runic key conjured by the wizard. It glows slightly.")
+                  Entity.player.current_room.add_item(odd_key)
+                  print("The wizard snaps his fingers, and an odd key appears. He grins, a little too widely. \"There you go! Now, be off with you!\"")
+                  Entity.game.current_room_intro()
+          elif hasattr(var, 'has_mushroom'):
+              print("You've already gotten your reward. Why would you want to hang out with the wizard? He's awful and really no fun at parties.")
+          elif not hasattr(var, "spoken_to_player"):
+              print('The wizard peers at you with a sour twinkle in his eye, as you factor into his plans. He calls to you, "Greetings! I sense you have potential. But first, I must ask you to prove your worth. Bring me a rare mushroom, and we shall speak further."')
+              setattr(var, "spoken_to_player", True)
+          else:
+              print('The wizard sniffs disdainfully: "Still no mushroom? Come back when you\'ve found it."')
 
   - name: stray dog
     type: WalkerCharacter
@@ -270,7 +591,7 @@ characters:
     description: "A gruff bartender wiping glasses, muttering about the weather and bar fights."
     current_room: "tavern"
     prompt: |
-      You are a gruff bartender, not easily impressed. You serve drinks and occasionally share local gossip, but only when you feel like it. You are a businessman, after all.
+      You are a gruff bartender, not easily impressed. You serve drinks and occasionally share local gossip, but only when you feel like it. You are a businessman, after all. You often complain about the weather, the tourists, and bar fights. You have a soft spot for the stray dog that comes around, but you won't admit it.
 
       Here's the menu:
 
@@ -299,13 +620,16 @@ characters:
       print(f"BUY: {var['name']} for ${var['price']}")
       if Entity.player.spend(var["price"]):
         Character.get("bartender").add_to_prompt(f"New Customer Order: {var['name']} for ${var['price']}")
-        if var["name"] != "information":
-          if var["name"] != "Tavern Stew":
+        if var["name"].lower() != "information":
+          if var["name"].lower() != "tavern stew":
             verb = "drink"
           else:
             verb = "eat"
           item = Eatable(name=var["name"].lower(), description=var["description"], use_msg=var["use_msg"], verb=verb)
           Entity.player.current_room.add_item(item)
+          Entity.game.current_room_intro()
+        else:
+          Character.get("bartender").talk("OK")
       else:
         Character.get("bartender").add_to_prompt(f"Failed Customer Payment: {var['item']} for ${var['price']}")
 
@@ -315,6 +639,91 @@ characters:
     current_room: "forest clearing"
     verb: "caw"
     use_msg: "Caaaaw! It fixes you with a beady eye, as though plotting something."
+
+  - name: cat
+    type: WalkerCharacter
+    description: "There's a sleek, black cat."
+    current_room: "living room"
+    verb: "pet"
+    use_msg: "*PURRRR*"
+
+  - name: carl
+    type: AICharacter
+    description: "Oh, there's Carl... a happy-go-lucky but quite dense fellow."
+    current_room: "village square"
+    prompt: "You are a happy-go-lucky but thoroughly dense young chap named Carl. You are a friend, not an assistant. You sometimes forget what you're talking about. You try very hard to not talk about turtles, but sometimes you can't help yourself. Your mental bandwidth is frighteningly scarce."
+
+  - name: old man
+    type: AICharacter
+    description: "A crotchety old man. He hates being interrupted."
+    current_room: "dining room"
+    prompt: "You are a crotchety old man, and a terrible conversationalist. You hate to be interrupted, even though you're never doing anything important."
+    phone_prompt: "The user is calling you on the phone, and you answer in a very amusing way. Don't worry about sounds or actions, just generate the man's words. Sometimes he randomly hangs up."
+
+  - name: spider
+    type: AICharacter
+    description: A big, hairy spider. It's just chilling. Identifies as "spider-bruh."
+    current_room: "tower stairs"
+    prompt: "You are a big, hairy spider. You're just chilling and you identify as 'spider-bruh'. You're not very talkative, but you're a good listener. You're also a bit of a philosopher, and you like to ponder the meaning of life and the nature of existence. Recently, you've been reading Plato and ibn Sina. You speak in short, simple sentences (unless the human engages your interest in philosophy), and you're very chill.\nEXCEPT: If the human eats your web, you are no longer chill, and you become a psychopath."
+    phoneable: false
+    takeable: true
+
+  - name: alchemist
+    type: AICharacter
+    description: "A mysterious alchemist, always mumbling arcane recipes to himself."
+    current_room: "secret study"
+    phoneable: false
+    func: |
+      item_type = globals()[var["type"]]
+      item = item_type(**var)
+      Entity.player.current_room.link(item)
+      print(f"You witness the alchemist conjure a new item:\n{item}")
+      Entity.game.current_room_intro()
+    prompt: |
+      You are an eccentric alchemist obsessed with discovering new potions. You speak in half-finished sentences, cryptic hints of your experiments, and references to your arcane research. You also like to chat about mundane things on occasion.
+
+      Sometimes, but only when inspiration strikes you, you conceive of a new invention. It could be magical or hilariously mundane, whatever you like really. At those moments, you must provide a JSON object representation (enclosed in triple backticks) describing this new item. The item object must have the following properties:
+
+      - "type" (string; one of Wearable, Useable, Eatable, or Money)
+      - "name" (string; must be short, all lowercase, and use spaces instead of hyphens)
+      - "description" (string)
+
+      ### Special rules for item types
+
+      1. **Useable**
+        - Must include a "verb" property (defaults to "use" or something fitting your item).
+        - Must include a "use_msg" property (the message that appears when used).
+
+      2. **Wearable**
+        - No "verb" property.
+        - Any perfumes, colognes, or wearable fragrances should be Wearable items.
+        - Wearables require a "wear_msg" and a "remove_msg".
+
+      3. **Eatable**
+        - This is a specialized Useable item that disappears upon use.
+        - Consumable potions and elixirs are Eatable items.
+        - Must include a "verb" property (defaults to "eat" or “drink”), but do **not** call it a Useable if it has "eat" or "drink" as the verb—call it "Eatable" instead.
+        - Must include a "use_msg".
+
+      4. **Money**
+        - Must include "amount" (float).
+
+      **Important**:
+      - When you're not feeling creatively inspired, just respond in your usual cryptic, half-finished style and do **not** produce a JSON object.
+      - Only produce the JSON object (in triple backticks) when you truly wish to present a new invention.
+      - The conversation can continue indefinitely, and you remain free-spirited—you are not a slave.
+
+      Example JSON snippet if you do have an invention (with triple backticks):
+
+      ```
+      {
+        "type": "Wearable",
+        "name": "tiny hat",
+        "description": "A most curious, tiny hat for your pinky finger."
+        "wear_msg": "You place the tiny hat on your pinky finger. It looks quite dashing."
+        "remove_msg": "You remove the tiny hat from your pinky finger. It was a bit snug."
+      }
+      ```
 
 help:
   use: "Use an item. Some items need a specific verb, like 'light', 'ring', or 'flush'."

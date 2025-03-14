@@ -152,80 +152,65 @@ class AICharacter(Character):
 
     def talk(self, msg=None, phone=False):
         OpenAIClient.connect()
-        thread = None
-        assistant = None
 
-        if phone and self.phoneable:
-            thread = self.phone_thread
-            assistant = self.phone_assistant
+        thread = self.phone_thread if phone and self.phoneable else self.thread
+        assistant = self.phone_assistant if phone and self.phoneable else self.assistant
 
-            OpenAIClient.client.beta.threads.messages.create(
-                thread_id=thread.id,
-                role="user",
-                content="phone rings"
-            )
-
-        elif phone and not self.phoneable:
+        if phone and not self.phoneable:
             print("You can't call that character.")
             return
-        else:
-            thread = self.thread
-            assistant = self.assistant
-            if msg != None:
-                OpenAIClient.client.beta.threads.messages.create(
-                    thread_id=thread.id,
-                    role="user",
-                    content=msg
-                )
-            else:
-                last_input = input("(input): ")
-                message = OpenAIClient.client.beta.threads.messages.create(
-                    thread_id=thread.id,
-                    role="user",
-                    content=last_input
-                )
 
-        messages = None
-        last_input = ""
+        user_message = "phone rings" if phone else msg
+
+        if user_message is None:
+            user_message = input("(input): ")
+
+        OpenAIClient.client.beta.threads.messages.create(
+            thread_id=thread.id,
+            role="user",
+            content=user_message
+        )
+
         hangups = r"bye|\*hangs up\*|\*click\*"
 
-        while messages == None or (not re.search(hangups, messages.data[0].content[0].text.value.lower(), re.IGNORECASE) and not re.search(hangups, last_input.lower(), re.IGNORECASE)):
+        run_stream = OpenAIClient.client.beta.threads.runs.create(
+            thread_id=thread.id,
+            assistant_id=assistant.id,
+            stream=True
+        )
 
-            run = OpenAIClient.client.beta.threads.runs.create_and_poll(
-                thread_id=thread.id,
-                assistant_id=assistant.id
-            )
-            if run.status == 'completed': 
-                messages = OpenAIClient.client.beta.threads.messages.list(thread_id=thread.id)
-                message = messages.data[0].content[0].text.value
-                message_stripped = replace_triple_backticks(message)
-                json_obj = find_json_objects(message)
-                print()
-                if len(json_obj) > 0:
-                    self.func(json_obj[0])
-                    print(replace_triple_backticks(message, f"{json_obj[0]['name'].upper()} -- {json_obj[0]['description']}"))
-                elif message_stripped != message and len(json_obj) < 1:
-                    print(f"ERROR: assistant provided object but it wasn't picked up:\n\n{message}")
-                else:
-                    print(message)
-                if re.search(hangups, message.lower(), re.IGNORECASE) or re.search(hangups, last_input.lower(), re.IGNORECASE):
-                    if not phone:
-                        Entity.game.current_room_intro()
-                    return True
-                #else:
-                #    print(run.status)
+        full_message = ""
+        display_stream = True
 
-            last_input = input("(input): ")
-            if messages != None:
-                if re.search(hangups, message.lower(), re.IGNORECASE) or re.search(hangups, last_input.lower(), re.IGNORECASE):
-                    if not phone:
-                        Entity.game.current_room_intro()
-                    return True
-            OpenAIClient.client.beta.threads.messages.create(
-                thread_id=thread.id,
-                role="user",
-                content=last_input
-            )
+        print("\nCharacter response:", end="\n\n")
+
+        for event in run_stream:
+            if event.event == 'thread.message.delta':
+                for delta in event.data.delta.content:
+                    if delta.type == 'text':
+                        chunk = delta.text.value
+                        full_message += chunk
+                        display_stream = (full_message.count('```') % 2 == 0)
+                        if display_stream:
+                            print(chunk, end="", flush=True)
+
+        print("\n")
+
+        message_stripped = replace_triple_backticks(full_message)
+        json_obj = find_json_objects(full_message)
+
+        if len(json_obj) > 0:
+            self.func(json_obj[0])
+            return True
+        elif message_stripped != full_message and len(json_obj) < 1:
+            print(f"ERROR: assistant provided object but it wasn't picked up:\n\n{full_message}")
+
+        if re.search(hangups, full_message.lower(), re.IGNORECASE) or re.search(hangups, user_message.lower(), re.IGNORECASE):
+            if not phone:
+                Entity.game.current_room_intro()
+            return True
+        else:
+            return self.talk(phone=phone)
 
     def add_to_prompt(self, new_instructions: str):
         """

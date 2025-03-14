@@ -21,7 +21,7 @@ class Entity:
             Entity.world.link(self)
 
     def __str__(self):
-        return f"<{self.__class__}:{self.name}>"
+        return f"{self.name.upper()} -- {self.description}"
 
     def __repr__(self):
         return self.__str__()
@@ -269,7 +269,7 @@ class Door(Room):
         if Entity.player.in_rooms(self):
             if self.locked == False:
                 print("This door is already unlocked")
-            elif self.key in Entity.player.inv_items.values():
+            elif self.key in Entity.player.inv_items.values() or self.key in Entity.player.inv_items.keys():
                 self.locked = False
                 print("Door unlocked")
                 self.remove_action("unlock")

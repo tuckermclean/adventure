@@ -33,7 +33,10 @@ class Adventure(cmd2.Cmd):
                     for door in world['doors']:
                         door['room1'] = Room.get(door['room1'])
                         door['room2'] = Room.get(door['room2'])
-                        door['key'] = Item.get(door['key'])
+                        try:
+                            door['key'] = Item.get(door['key'])
+                        except:
+                            pass
                         Door(**door)
                     for character in world['characters']:
                         character_class = globals()[character['type']]
