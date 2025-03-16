@@ -92,6 +92,7 @@ class WalkerCharacter(NonPlayerCharacter):
 
 class OpenAIClient():
     client = None
+    assistants = None
 
     @staticmethod
     def connect(api_key=os.getenv("OPENAI_API_KEY")):
@@ -102,17 +103,19 @@ class OpenAIClient():
     @staticmethod
     def get_or_create_assistant(name, instructions, model="gpt-4-turbo"):
         # Check if the assistant already exists
-        assistants = OpenAIClient.client.beta.assistants.list()
-        for assistant in assistants.data:
+        if OpenAIClient.assistants == None:
+            OpenAIClient.assistants = OpenAIClient.client.beta.assistants.list()
+        for assistant in OpenAIClient.assistants.data:
             if assistant.name == name:
                 return assistant  # Return existing assistant if found
 
         # If not found, create a new assistant
-        return OpenAIClient.client.beta.assistants.create(
+        assistant = OpenAIClient.client.beta.assistants.create(
             name=name,
             model=model,
             instructions=instructions,
         )
+        OpenAIClient.assistants = OpenAIClient.client.beta.assistants.list()
 
     @staticmethod
     def oneoff_prompt(prompt, model="gpt-4-turbo"):
