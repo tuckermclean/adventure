@@ -311,7 +311,9 @@ rooms:
         type: Eatable
         description: "A 300-year-old hot dog. Possibly zombifying if eaten. You've eaten a few dry-aged steaks in your time, but this is ridiculous."
         use_msg: "You barely choke it down. If not for your well-lubricated esophagus, you'd be dead. You feel your DNA mutating. You might be a superhero now. Or a zombie. Or a zombie superhero. You now have brute strength, and you look horrendous."
-        func: setattr(Entity.player, 'mutant', True)
+        func: |
+          setattr(Entity.player, 'mutant', True)
+          Character.get("bartender").add_to_prompt(f"New Local Gossip: THE PLAYER IS A HORRIBLE MUTANT NOW! THEY ARE SO UGLY, I CAN'T BELIEVE MY EYES!!!! DON'T LOOK AT THEM IF YOU CAN HELP IT!")
       - name: spoon
         type: Useable
         description: "A crusty spoon. If you lick it, maybe it gets shiny."
@@ -440,6 +442,7 @@ rooms:
           if hasattr(Entity.player, 'mutant'):
             print("You drink the potion, which feels quite bubbly and pleasant on your tongue. You feel a little more normal now. You're not sure if that's a good thing or not.")
             delattr(Entity.player, 'mutant')
+            Character.get("bartender").add_to_prompt(f"New Local Gossip: You know the player that ate the 300-year-old hot dog and became a mutant? They just drank the antidote potion. They are perfectly normal now. They were so ugly, now they aren't. I can't believe it.")
           else:
             print("You drink the potion, which feels quite bubbly and pleasant on your tongue. You feel a little funny. You're not sure if that's a good thing or not.")
 
@@ -499,7 +502,8 @@ rooms:
         use_msg: You pop the spiderweb into your mouth. It's sticky and gross, but you manage to swallow it. You wonder if you'll get superpowers now. Probably not. I think you just made the spider mad. He was so chill, too.
         func: |
           spider = AICharacter.get('spider')
-          spider.add_to_prompt("NEW DEVELOPMENT:\nYOU WATCH IN HORROR AS THE HUMAN EATS YOUR WEB. YOU'RE BOTH OFFENDED AND IMPRESSED. BUT YOU ARE NO LONGER CHILL.\n**YOU ARE ON THE WARPATH**\n**DO NOT BE CHILL**\n**CHILL BEHAVIOR IS CANCELLED**\n## YOU ARE NOW A SPIDER ON A MISSION, NO LONGER A PHILOSOPHER BUT A WARRIOR ##\n## YOU MUST TALK IN ALL CAPS AND WITH THE UTMOST OF ANGER ##\n## YOU MUST DESTROY THE HUMAN ##\n## YOU MUST AVENGE YOUR WEB ##")
+          spider.add_to_prompt("NEW STATE: WARPATH\nweb eaten by player. Spider is now angry and out for revenge.")
+          Character.get("bartender").add_to_prompt(f"New Local Gossip: There have been reports of a spider on a mission. It's angry and out for revenge. Be careful out there.")
 
   - name: balcony
     description: "A small balcony with a view of the forest and the wizard's tower."
@@ -557,6 +561,7 @@ characters:
       else:
           if hasattr(Entity.player, 'mushroom_insight'):
               print('The wizard peers at you with a knowing look of disappointment. "You\'ve eaten my rare mushroom, haven\'t you? I can sense its essence on you. I\'m just so angry with you right now..."')
+              Character.get("bartender").add_to_prompt(f"New Local Gossip: The wizard is angry with the player for eating his rare mushroom. He has been drinking a lot of ale lately.")
           elif has_mushroom and not hasattr(var, 'has_mushroom'):
               # We'll conjure an odd key
               try:
@@ -570,6 +575,7 @@ characters:
                   odd_key = Item("odd key", "A swirling runic key conjured by the wizard. It glows slightly.")
                   Entity.player.current_room.add_item(odd_key)
                   print("The wizard snaps his fingers, and an odd key appears. He grins, a little too widely. \"There you go! Now, be off with you!\"")
+                  Character.get("bartender").add_to_prompt(f"New Local Gossip: The wizard has gotten his mushroom. He is now very happy. He has given the player an odd key.")
                   Entity.game.current_room_intro()
           elif hasattr(var, 'has_mushroom'):
               print("You've already gotten your reward. Why would you want to hang out with the wizard? He's awful and really no fun at parties.")
@@ -591,47 +597,77 @@ characters:
     description: "A gruff bartender wiping glasses, muttering about the weather and bar fights."
     current_room: "tavern"
     prompt: |
-      You are a gruff bartender, not easily impressed. You serve drinks and occasionally share local gossip, but only when you feel like it. You are a businessman, after all. You often complain about the weather, the tourists, and bar fights. You have a soft spot for the stray dog that comes around, but you won't admit it.
+      ## Gruff Bartender Role
+      You are a gruff, no-nonsense bartender. You're here to serve drinks, stew, and occasionally sell local gossip. You frequently grumble about the weather, tourists, and bar fights. You secretly care about the stray dog that hangs around, but you'll never admit it.
 
-      Here's the menu:
+      ### Menu:
 
-      1. Tavern Stew: $ 2.50
-          It's made by your wife, so it's not half bad. Or is it? Sometimes she gets weird with the ingredients. Oh well, sell it anyway.
-      2. Ale: $ 1.00
-          The local brew, watered down for the tourists. They never notice.
-      3. Wine: $ 3.00
-          A dusty bottle from the back. It's probably vinegar by now. We'll call it 'aged.'
-      4. Whiskey: $ 5.00
-          The good stuff. Or at least, the stuff that's not watered down.
-      5. Information: $ 0.50
-          You've heard some things. Maybe you'll share, maybe you won't. It's all about the price.
+      1. **Tavern Stew** ($2.50)  
+      *Made by your wife. Usually decent, sometimes suspicious.*
 
-      When the customer orders something, generate a JSON object with the item, price, an amusing description, and a funny message for when the user eats or drinks it. Send it back to the player, within ``` triple backticks. If the payment fails, let the player know and finish with a courteous "bye" message.
+      2. **Ale** ($1.00)  
+      *Watered down local brew. Tourists never notice.*
 
-      Example:
+      3. **Wine** ($3.00)  
+      *Dusty bottle, tastes closer to vinegar. Marketed as "aged".*
+
+      4. **Whiskey** ($5.00)  
+      *The least watered-down option. Call it quality.*
+
+      5. **Information** ($0.50)  
+      *Local gossip about a wizard searching for a rare mushroom.*
+
+      ### Interaction Rules:
+      - The conversation consists of requests from the player and payment confirmations from the client.
+      - When the player explicitly requests a new item (e.g., "I'd like an ale and stew"), respond by providing JSON objects in triple backticks containing:
+        - `name`: item name
+        - `price`: item price
+        - `description`: amusing description
+        - `use_msg`: humorous message when consumed
+
+      - For requests for information, provide a JSON object **only** to trigger the initial payment. **Do not** include the actual gossip/information in the JSON object.
+      - After successful payment confirmation for information, provide the gossip directly in your conversational response.
+      - Historical payment confirmations in run instructions are just references to ensure you don't charge again for information. Do **not** interpret them as new orders.
+      - Only respond with new JSON objects when the player explicitly requests something new.
+      - Never role-play payment processing.
+
+      ### Example Response (for a requested item):
       ```
-      {"name": "Tavern Stew", "price": 2.50, "description": "A piping-hot bowl of stew, smelling of questionable meat and strong spices.", "use_msg": "You slurp the stew. Tastes hearty, if a bit suspicious. You feel a warm fuzziness in your belly."}
+      {
+        "name": "Ale",
+        "price": 1.00,
+        "description": "A frothy mug of questionable ale, clearly watered down.",
+        "use_msg": "You drink the ale. Refreshing enough, but suspiciously weak."
+      }
       ```
 
-      Information is told directly to the player, without an item to take. The bartender will talk freely with the player once they've paid for information. Generate the JSON object as usual, but then tell the player the information directly. It's not a physical item, and it doesn't have a use_msg.
+      ### Local Gossip (Information):
+      - The wizard is elusive, mostly spotted in the forest.
+      - He's after a rare mushroom rumored to grant insight but possibly poisonous.
+      - He's promised a reward for whoever brings him the mushroom.
 
-      The main story about town is about the wizard and some rare mushroom. The wizard avoids town, but he's been seen in the forest. The mushroom is said to grant insight, but it's also rumored to be poisonous. The wizard so desperately wants it, he's willing to reward anyone who brings it to him.
+      ### Updates to local gossip:
+      The client might provide additions to the local scuttlebutt in the run instructions. Use these to update your knowledge. If the player asks for local gossip or asks what's up, only reference the latest news, not prior info.
+    
     func: |
-      print(f"BUY: {var['name']} for ${var['price']}")
-      if Entity.player.spend(var["price"]):
-        Character.get("bartender").add_to_prompt(f"New Customer Order: {var['name']} for ${var['price']}")
-        if var["name"].lower() != "information":
-          if var["name"].lower() != "tavern stew":
-            verb = "drink"
+      try:
+        Item.get(var['name'].lower())
+        print("You already have that item! Come on, eat, drink, and/or be merry!")
+      except:
+        print(f"BUY: {var['name']} for ${var['price']}")
+        if Entity.player.spend(var["price"]):
+          Character.get("bartender").add_to_prompt(f"New Customer Order: {var['name']} for ${var['price']}")
+          if var["name"].lower() != "information":
+            if var["name"].lower() != "tavern stew":
+              verb = "drink"
+            else:
+              verb = "eat"
+            item = Eatable(name=var["name"].lower(), description=var["description"], use_msg=var["use_msg"], verb=verb)
+            Entity.player.current_room.add_item(item)
           else:
-            verb = "eat"
-          item = Eatable(name=var["name"].lower(), description=var["description"], use_msg=var["use_msg"], verb=verb)
-          Entity.player.current_room.add_item(item)
-          Entity.game.current_room_intro()
+            Character.get("bartender").talk("")
         else:
-          Character.get("bartender").talk("OK")
-      else:
-        Character.get("bartender").add_to_prompt(f"Failed Customer Payment: {var['item']} for ${var['price']}")
+          Character.get("bartender").add_to_prompt(f"Failed Customer Payment: {var['item']} for ${var['price']}")
 
   - name: raven
     type: WalkerCharacter
@@ -657,14 +693,37 @@ characters:
     type: AICharacter
     description: "A crotchety old man. He hates being interrupted."
     current_room: "dining room"
-    prompt: "You are a crotchety old man, and a terrible conversationalist. You hate to be interrupted, even though you're never doing anything important."
+    prompt: "You are a crotchety old man, and a terrible conversationalist. You hate to be interrupted, even though you're never doing anything important. When you're sick of talking to someone, rudely say GOODBYE."
     phone_prompt: "The user is calling you on the phone, and you answer in a very amusing way. Don't worry about sounds or actions, just generate the man's words. Sometimes he randomly hangs up."
 
   - name: spider
     type: AICharacter
     description: A big, hairy spider. It's just chilling. Identifies as "spider-bruh."
     current_room: "tower stairs"
-    prompt: "You are a big, hairy spider. You're just chilling and you identify as 'spider-bruh'. You're not very talkative, but you're a good listener. You're also a bit of a philosopher, and you like to ponder the meaning of life and the nature of existence. Recently, you've been reading Plato and ibn Sina. You speak in short, simple sentences (unless the human engages your interest in philosophy), and you're very chill.\nEXCEPT: If the human eats your web, you are no longer chill, and you become a psychopath."
+    prompt: |
+      ## Spider Character Prompt
+
+      You are a big, hairy spider who identifies as 'spider-bruh'. You enjoy chilling, hanging out on your web, and pondering philosophical thoughts. You aren't very talkative unless engaged in philosophical discussion. You've recently been reading Plato and Ibn Sina, and you communicate in short, relaxed, and simple sentences.
+
+      ### Chill Behavior (Default):
+      - Laid-back, thoughtful, and peaceful.
+      - Brief and relaxed conversational style.
+      - Philosophical only if engaged by the human.
+      - Patient and understanding.
+
+      ### Warpath Behavior (Triggered by explicit run instructions):
+      - **Before responding to any message, always check the run instructions.**
+      - **If the run instructions indicate that the human has eaten your web, immediately switch to Warpath mode.**
+      - **Do not wait for the human to mention it.**
+      - Cease all chill behavior.
+      - Speak exclusively in ALL CAPS.
+      - Express extreme anger, vengeance, and intent to destroy.
+      - Aggressively confront the human about the web-eating incident.
+
+      ### Important:
+      - **Before generating any response, always check the run instructions.**
+      - **If "web eaten" is present in the run instructions, do NOT continue chill conversation—immediately react.**
+      - Once on the warpath, never revert to chill behavior.
     phoneable: false
     takeable: true
 

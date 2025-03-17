@@ -1,5 +1,5 @@
 from __future__ import annotations
-import random, re, os
+import random, re, os, time
 import openai
 from entities import Room, Item, Entity, EntityLinkException
 
@@ -92,30 +92,101 @@ class WalkerCharacter(NonPlayerCharacter):
 
 class OpenAIClient():
     client = None
-    assistants = None
+    assistants_cache = {}
 
     @staticmethod
     def connect(api_key=os.getenv("OPENAI_API_KEY")):
-        if OpenAIClient.client == None:
+        if OpenAIClient.client is None:
             OpenAIClient.client = openai.OpenAI(api_key=api_key)
-        openai.api_key = api_key
 
     @staticmethod
     def get_or_create_assistant(name, instructions, model="gpt-4-turbo"):
-        # Check if the assistant already exists
-        if OpenAIClient.assistants == None:
-            OpenAIClient.assistants = OpenAIClient.client.beta.assistants.list()
-        for assistant in OpenAIClient.assistants.data:
-            if assistant.name == name:
-                return assistant  # Return existing assistant if found
+        OpenAIClient.connect()
 
-        # If not found, create a new assistant
-        assistant = OpenAIClient.client.beta.assistants.create(
-            name=name,
-            model=model,
-            instructions=instructions,
+        if name in OpenAIClient.assistants_cache:
+            return OpenAIClient.assistants_cache[name]
+
+        if not OpenAIClient.assistants_cache:
+            assistants = OpenAIClient.client.beta.assistants.list().data
+            OpenAIClient.assistants_cache = {a.name: a for a in assistants}
+
+        assistant = OpenAIClient.assistants_cache.get(name)
+        if assistant is None:
+            assistant = OpenAIClient.client.beta.assistants.create(
+                name=name,
+                model=model,
+                instructions=instructions,
+            )
+            OpenAIClient.assistants_cache[name] = assistant
+
+        return assistant
+
+    @staticmethod
+    def create_thread():
+        OpenAIClient.connect()
+        return OpenAIClient.client.beta.threads.create().id
+
+    @staticmethod
+    def add_message(thread_id, content, role="user"):
+        OpenAIClient.connect()
+
+        OpenAIClient.client.beta.threads.messages.create(
+            thread_id=thread_id, role=role, content=content
         )
-        OpenAIClient.assistants = OpenAIClient.client.beta.assistants.list()
+
+    @staticmethod
+    def stream_assistant_response(thread_id, assistant_name, additional_instructions=""):
+        OpenAIClient.connect()
+
+        assistant = OpenAIClient.assistants_cache[assistant_name]
+        retries = 5
+        while True:
+            try:
+                run_stream = OpenAIClient.client.beta.threads.runs.create(
+                    thread_id=thread_id,
+                    assistant_id=assistant.id,
+                    additional_instructions=additional_instructions,
+                    stream=True
+                )
+                break
+            except Exception as e:
+                if retries > 0:
+                    time.sleep(1)
+                    retries -= 1
+                else:
+                    raise e
+
+        buffer = ""
+        collecting_json = False
+
+        for event in run_stream:
+            if event.data.object == 'thread.message.delta':
+                for delta in event.data.delta.content:
+                    if delta.type == 'text':
+                        chunk = delta.text.value
+                        buffer += chunk
+
+                        if '`' in buffer:
+                            if '``' in buffer:
+                                if '```' in buffer:
+                                    collecting_json = not collecting_json
+                                    # Remove the backticks from the buffer
+                                    buffer = buffer.replace('```', '')
+                                    if not collecting_json:
+                                        json_obj = find_json_objects(buffer)
+                                        if json_obj:
+                                            for obj in json_obj:
+                                                yield obj
+                                    else:
+                                        continue
+                                else:
+                                    continue
+                            else:
+                                continue
+                        elif not collecting_json:
+                            yielded = buffer
+                            buffer = ""
+                            yield yielded
 
     @staticmethod
     def oneoff_prompt(prompt, model="gpt-4-turbo"):
@@ -134,102 +205,77 @@ class AICharacter(Character):
                                "Don't worry about sounds or actions, just generate the words."),
                  func=lambda json: print(f"Character returned: {json}"), **kwargs):
         super().__init__(name=name, description=description, current_room=current_room)
-        self.phoneable = (phone_prompt != None)
+        self.phoneable = phone_prompt is not None
         self.func = func
         self.add_action("talk", self.talk)
+        self.additional_instructions = ""
 
         OpenAIClient.connect()
-        self.assistant = OpenAIClient.get_or_create_assistant(
-            name=name,
-            instructions=prompt,
-        )
-        self.thread = OpenAIClient.client.beta.threads.create()
+        self.assistant_name = name
+        self.phone_assistant_name = f"{name}_phone"
+
+        OpenAIClient.get_or_create_assistant(name, prompt)
+        self.thread_id = OpenAIClient.create_thread()
 
         if self.phoneable:
-            self.phone_assistant = OpenAIClient.get_or_create_assistant(
-                name=f"{name}_phone",
-                instructions=f"{prompt} {phone_prompt}",
-            )
-
-            self.phone_thread = OpenAIClient.client.beta.threads.create()
+            OpenAIClient.get_or_create_assistant(self.phone_assistant_name, f"{prompt} {phone_prompt}")
+            self.phone_thread_id = OpenAIClient.create_thread()
 
     def talk(self, msg=None, phone=False):
         OpenAIClient.connect()
-
-        thread = self.phone_thread if phone and self.phoneable else self.thread
-        assistant = self.phone_assistant if phone and self.phoneable else self.assistant
 
         if phone and not self.phoneable:
             print("You can't call that character.")
             return
 
-        user_message = "phone rings" if phone else msg
+        thread_id = self.phone_thread_id if phone and self.phoneable else self.thread_id
+        assistant_name = self.phone_assistant_name if phone and self.phoneable else self.assistant_name
 
-        if user_message is None:
-            user_message = input("(input): ")
-
-        OpenAIClient.client.beta.threads.messages.create(
-            thread_id=thread.id,
-            role="user",
-            content=user_message
-        )
+        if msg != "":
+            user_message = "phone rings" if phone else (msg or input("(input): "))
+            OpenAIClient.add_message(thread_id, user_message)
+        else:
+            user_message = ""
 
         hangups = r"bye|\*hangs up\*|\*click\*"
-
-        run_stream = OpenAIClient.client.beta.threads.runs.create(
-            thread_id=thread.id,
-            assistant_id=assistant.id,
-            stream=True
-        )
-
         full_message = ""
-        display_stream = True
+        bye = False
 
-        print("\nCharacter response:", end="\n\n")
+        print("\nCharacter response:\n")
 
-        for event in run_stream:
-            if event.event == 'thread.message.delta':
-                for delta in event.data.delta.content:
-                    if delta.type == 'text':
-                        chunk = delta.text.value
-                        full_message += chunk
-                        display_stream = (full_message.count('```') % 2 == 0)
-                        if display_stream:
-                            print(chunk, end="", flush=True)
+        for chunk in OpenAIClient.stream_assistant_response(thread_id, assistant_name, additional_instructions=self.additional_instructions):
+            if isinstance(chunk, str):
+                print(chunk, end="", flush=True)
+                full_message += chunk
+            elif isinstance(chunk, dict):
+                self.func(chunk)
+                bye = True
+            elif isinstance(chunk, list):
+                for obj in chunk:
+                    self.func(obj)
+                bye = True
 
         print("\n")
 
-        message_stripped = replace_triple_backticks(full_message)
-        json_obj = find_json_objects(full_message)
-
-        if len(json_obj) > 0:
-            self.func(json_obj[0])
-            return True
-        elif message_stripped != full_message and len(json_obj) < 1:
-            print(f"ERROR: assistant provided object but it wasn't picked up:\n\n{full_message}")
-
         if re.search(hangups, full_message.lower(), re.IGNORECASE) or re.search(hangups, user_message.lower(), re.IGNORECASE):
-            if not phone:
-                Entity.game.current_room_intro()
-            return True
-        else:
+            bye = True
+        elif not bye:
             return self.talk(phone=phone)
+
+        if bye:
+            Entity.game.current_room_intro()
+            return True
 
     def add_to_prompt(self, new_instructions: str):
         """
         Insert a 'system' message into the existing thread,
         effectively updating the context for subsequent calls.
         """
-        if not hasattr(self, 'thread') or self.thread is None:
+        if not hasattr(self, 'thread_id') or self.thread_id is None:
             print("No active thread to update.")
             return
 
-        # We create a new system message in the same thread
-        OpenAIClient.client.beta.threads.messages.create(
-            thread_id=self.thread.id,
-            role="user",
-            content=f"(System Update): {new_instructions}"
-        )
+        self.additional_instructions += f"\n{new_instructions}"
 
 def find_json_objects(text: str):
     """
