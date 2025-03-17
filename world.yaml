@@ -159,7 +159,7 @@ rooms:
           elif hasattr(Entity.player, 'potion_insight'):
             print("You hold the moss-covered tablet. The words seem to shift and change, revealing a hidden message as the potion insight takes hold:\n")
           else:
-            print("You hold the moss-covered tablet. The words seem to shift and change, but you can't quite make them out.")
+            print("You hold the moss-covered tablet. The words seem to shift and change, but you can't quite make them out. Maybe some magical insight would help?\n")
           if hasattr(Entity.player, 'mushroom_insight') or hasattr(Entity.player, 'potion_insight'):
             print("""The hero Arion, with silver eyes, traveled across distant mountains to slay monsters born from shadow. Alongside him walked his companion Selene—a woman of great wisdom, whose heart knew no fear.
           
@@ -283,7 +283,9 @@ rooms:
         type: Useable
         description: "A very old, antique paintbrush. Looks like it was used by a big ol' hippy."
         use_msg: "OMG LOOK, A BIG OL' HIPPY!"
-        func: setattr(Entity.player, 'big_ol_hippy', True)
+        func: |
+          setattr(Entity.player, 'big_ol_hippy', True)
+          Character.get("bartender").add_to_prompt(f"New Local Gossip: People have seen the player painting with a big ol' hippy paintbrush. They are now a big ol' hippy. They are so groovy.")
       - name: book
         type: Useable
         description: "A very olde booke of whimsical apophthegms. It's a fortune cookie in book form."
@@ -313,7 +315,7 @@ rooms:
         use_msg: "You barely choke it down. If not for your well-lubricated esophagus, you'd be dead. You feel your DNA mutating. You might be a superhero now. Or a zombie. Or a zombie superhero. You now have brute strength, and you look horrendous."
         func: |
           setattr(Entity.player, 'mutant', True)
-          Character.get("bartender").add_to_prompt(f"New Local Gossip: THE PLAYER IS A HORRIBLE MUTANT NOW! THEY ARE SO UGLY, I CAN'T BELIEVE MY EYES!!!! DON'T LOOK AT THEM IF YOU CAN HELP IT!")
+          Character.get("bartender").add_to_prompt(f"New Local Gossip: THE PLAYER IS A HORRIBLE MUTANT NOW! THEY ARE SO UGLY NOW!! DON'T LOOK AT THEM IF YOU CAN HELP IT! THEY WILL FOR SURE TURN YOUR FACE INTO STONE!!!")
       - name: spoon
         type: Useable
         description: "A crusty spoon. If you lick it, maybe it gets shiny."
@@ -594,11 +596,11 @@ characters:
 
   - name: bartender
     type: AICharacter
-    description: "A gruff bartender wiping glasses, muttering about the weather and bar fights."
+    description: "A gruff bartender wiping glasses, muttering to himself. Ask him for a menu and local gossip."
     current_room: "tavern"
     prompt: |
       ## Gruff Bartender Role
-      You are a gruff, no-nonsense bartender. You're here to serve drinks, stew, and occasionally sell local gossip. You frequently grumble about the weather, tourists, and bar fights. You secretly care about the stray dog that hangs around, but you'll never admit it.
+      You are a gruff, no-nonsense bartender. You're here to serve drinks, stew, and occasionally tell local gossip. You frequently grumble about the weather, tourists, and bar fights. You secretly care about the stray dog that hangs around, but you'll never admit it.
 
       ### Menu:
 
@@ -614,9 +616,6 @@ characters:
       4. **Whiskey** ($5.00)  
       *The least watered-down option. Call it quality.*
 
-      5. **Information** ($0.50)  
-      *Local gossip about a wizard searching for a rare mushroom.*
-
       ### Interaction Rules:
       - The conversation consists of requests from the player and payment confirmations from the client.
       - When the player explicitly requests a new item (e.g., "I'd like an ale and stew"), respond by providing JSON objects in triple backticks containing:
@@ -625,8 +624,6 @@ characters:
         - `description`: amusing description
         - `use_msg`: humorous message when consumed
 
-      - For requests for information, provide a JSON object **only** to trigger the initial payment. **Do not** include the actual gossip/information in the JSON object.
-      - After successful payment confirmation for information, provide the gossip directly in your conversational response.
       - Historical payment confirmations in run instructions are just references to ensure you don't charge again for information. Do **not** interpret them as new orders.
       - Only respond with new JSON objects when the player explicitly requests something new.
       - Never role-play payment processing.
@@ -642,12 +639,10 @@ characters:
       ```
 
       ### Local Gossip (Information):
-      - The wizard is elusive, mostly spotted in the forest.
-      - He's after a rare mushroom rumored to grant insight but possibly poisonous.
-      - He's promised a reward for whoever brings him the mushroom.
+      - There's a wizard who tends to keep to himself in the forest. When he does talk, he can't stop yammering about a rare mushroom. He seems willing to pay for it.
 
-      ### Updates to local gossip:
-      The client might provide additions to the local scuttlebutt in the run instructions. Use these to update your knowledge. If the player asks for local gossip or asks what's up, only reference the latest news, not prior info.
+      ### Updates to Local Gossip:
+      The client might provide updates on the local scuttlebutt in the run instructions. Use these to update your knowledge. If the player asks for information or asks what's up, only reference the latest news, not prior info.
     
     func: |
       try:
@@ -657,15 +652,12 @@ characters:
         print(f"BUY: {var['name']} for ${var['price']}")
         if Entity.player.spend(var["price"]):
           Character.get("bartender").add_to_prompt(f"New Customer Order: {var['name']} for ${var['price']}")
-          if var["name"].lower() != "information":
-            if var["name"].lower() != "tavern stew":
-              verb = "drink"
-            else:
-              verb = "eat"
-            item = Eatable(name=var["name"].lower(), description=var["description"], use_msg=var["use_msg"], verb=verb)
-            Entity.player.current_room.add_item(item)
+          if var["name"].lower() != "tavern stew":
+            verb = "drink"
           else:
-            Character.get("bartender").talk("")
+            verb = "eat"
+          item = Eatable(name=var["name"].lower(), description=var["description"], use_msg=var["use_msg"], verb=verb)
+          Entity.player.current_room.add_item(item)
         else:
           Character.get("bartender").add_to_prompt(f"Failed Customer Payment: {var['item']} for ${var['price']}")
 
