@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Adventure Game</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        #output { white-space: pre-wrap; background: #222; color: #fff; padding: 10px; height: 300px; overflow-y: auto; }
+        input { width: 80%; padding: 10px; margin-top: 10px; }
+        button { padding: 10px; }
+    </style>
+</head>
+<body>
+    <h1>Adventure Game</h1>
+    <div id="output">Welcome! Loading the game...</div>
+    <input type="text" id="commandInput" placeholder="Type a command..." autofocus>
+    <button onclick="handleInput()">Submit</button>
+
+    <script>
+        let awaitingUserInput = false; // Tracks if the game is waiting for input
+
+        async function handleInput() {
+            let inputBox = document.getElementById("commandInput");
+            let input = inputBox.value.trim();
+            if (!input) return;
+
+            inputBox.value = ""; // Clear input
+
+            if (awaitingUserInput) {
+                // If the game is waiting for input, send to /submit_input
+                awaitingUserInput = false; // Reset the flag
+                await submitUserInput(input);
+            } else {
+                // Otherwise, send command normally
+                await sendCommand(input);
+            }
+        }
+
+        async function sendCommand(command) {
+            let response = await fetch("/command", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ command: command })
+            });
+
+            let result = await response.json();
+            updateOutput("> " + command + "\n" + result.response);
+
+            // If the response suggests the game is waiting for input, set the flag
+            if (result.response.includes("?") || result.response.includes("What will you say")) {
+                awaitingUserInput = true;
+            }
+        }
+
+        async function submitUserInput(userInput) {
+            let response = await fetch("/submit_input", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ user_input: userInput })
+            });
+
+            let result = await response.json();
+            updateOutput("> " + userInput + "\n" + result.response);
+        }
+
+        function updateOutput(text) {
+            let outputDiv = document.getElementById("output");
+            outputDiv.innerText += "\n" + text;
+            outputDiv.scrollTop = outputDiv.scrollHeight;
+        }
+
+        async function startGame() {
+            let response = await fetch("/start");
+            let result = await response.json();
+            updateOutput(result.room_description);
+        }
+
+        startGame();
+    </script>
+</body>
+</html>
