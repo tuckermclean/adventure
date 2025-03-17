@@ -14,6 +14,7 @@ class Character(Item):
         self.inv_items = {}
         self.wearing = {}
         self.words = ""
+        self.watchers = {}
 
         if current_room != None and current_room.__class__ == Room:
             self.go(current_room)
@@ -55,6 +56,12 @@ class Character(Item):
             self.current_room.add_item(self)
         else:
             print("WALKER", self.name, "GO", room.name, "DIDN'T WORK")
+
+    def register_watcher(self, watcher):
+        self.watchers[watcher.name] = watcher
+
+    def unregister_watcher(self, watcher):
+        del self.watchers[watcher.name]
 
 class NonPlayerCharacter(Character):
     def __init__(self, name="npc", description="Just hanging around", current_room=None, lookable=True, verb="greet",

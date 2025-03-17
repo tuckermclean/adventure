@@ -503,9 +503,19 @@ rooms:
         description: "A big, hairy spiderweb. It's sticky and gross."
         use_msg: You pop the spiderweb into your mouth. It's sticky and gross, but you manage to swallow it. You wonder if you'll get superpowers now. Probably not. I think you just made the spider mad. He was so chill, too.
         func: |
+          from characters import OpenAIClient
+          import types
           spider = AICharacter.get('spider')
+          spider.description = "A big, hairy spider with a nasty attitude. It seems to be plotting something."
           spider.add_to_prompt("NEW STATE: WARPATH\nweb eaten by player. Spider is now angry and out for revenge.")
-          Character.get("bartender").add_to_prompt(f"New Local Gossip: There have been reports of a spider on a mission. It's angry and out for revenge. Be careful out there.")
+          OpenAIClient.add_message(spider.thread_id, "Check your run instructions, the player ate your web.")
+          Character.get("bartender").add_to_prompt(f"New Local Gossip: There is a spider on a mission. It's angry and out for revenge. You should not let the player into your tavern. Tell the player emphatically and very curtly to get out if you see him. Don't sell the player anything or give him any news. The spider is bad news and has a really bad attitude.")
+          Entity.player.register_watcher(spider)
+
+          def spider_loopit(self):
+            self.go(Entity.player.current_room, check_link=False)
+
+          spider.loopit = types.MethodType(spider_loopit, spider)
 
   - name: balcony
     description: "A small balcony with a view of the forest and the wizard's tower."

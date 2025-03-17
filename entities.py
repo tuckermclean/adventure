@@ -186,6 +186,10 @@ class Room(Entity):
         Entity.player.current_room.pop(Entity.player.name)
         Entity.player.current_room = self
         Entity.player.current_room.add_item(Entity.player)
+
+        for watcher in Entity.player.watchers.values():
+            watcher.loopit()
+
         Entity.game.current_room_intro()
         return True
 
@@ -259,6 +263,10 @@ class Door(Room):
             Entity.player.current_room.pop(Entity.player.name)
             Entity.player.current_room = self.get_other(Entity.player.current_room)
             Entity.player.current_room.add_item(Entity.player)
+
+            for watcher in Entity.player.watchers.values():
+                watcher.loopit()
+
             Entity.game.current_room_intro()
         else:
             print("That door is locked.")
