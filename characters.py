@@ -191,12 +191,20 @@ class OpenAIClient():
     @staticmethod
     def oneoff_prompt(prompt, model="gpt-4-turbo"):
         OpenAIClient.connect()
+
         response = openai.chat.completions.create(
             model=model,
             messages=[{"role": "user", "content": prompt}],
-            temperature=0.7
+            temperature=0.7,
+            stream=True
         )
-        return response.choices[0].message.content
+
+        try:
+            for chunk in response:
+                print(chunk.choices[0].delta.content or "", end="", flush=True)
+        except Exception as e:
+            print("Error:", e)
+        print()
 
 class AICharacter(Character):
     def __init__(self, name="ai character", description="Some NPC", current_room=None,

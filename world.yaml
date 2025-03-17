@@ -519,7 +519,7 @@ rooms:
         takeable: false
         func: |
           from characters import OpenAIClient
-          print(OpenAIClient.oneoff_prompt("Briefly describe the present view of a hilariously cursed, mystical forest from a tall tower through binoculars. No need to mention the binoculars or the tower. Over the treetops, you can see the wizard's tower. He's usually doing something ridiculous. One or two punchy sentences, 30 words max."))
+          OpenAIClient.oneoff_prompt("Briefly describe the present view of a hilariously cursed, mystical forest from a tall tower through binoculars. No need to mention the binoculars or the tower. Over the treetops, you can see the wizard's tower. He's usually doing something ridiculous, not juggling. One or two punchy sentences, 50 words max.")
 
 doors:
   - name: back door
