@@ -70,8 +70,12 @@ class Weapon(Useable):
         self.damage = damage
         self.add_action("use", self.use)
 
-    def use(self):
-        target = Character.get(input(f"Who do you want to hit? {list(dict(filter(lambda pair : type(pair[1]) in [Character, AICharacter, WalkerCharacter, NonPlayerCharacter], Entity.player.current_room.get_items().items())).keys())}: "))
+    def use(self, target=None):
+        if target == None:
+            target = Character.get(input(f"Who do you want to hit? {list(dict(filter(lambda pair : type(pair[1]) in [Character, AICharacter, WalkerCharacter, NonPlayerCharacter], Entity.player.current_room.get_items().items())).keys())}: "))
+        elif type(target) == str:
+            target = Character.get(target)
+
         if type(target) in [Character, AICharacter, WalkerCharacter, NonPlayerCharacter]:
             target.take_damage(self.damage)
         else:

@@ -4,6 +4,7 @@ import tkinter as tk
 from tkinter import messagebox, simpledialog
 from characters import Character, AICharacter
 from entities import Entity, Room, Door
+from items import Weapon
 from adventure import Adventure
 import sys
 import threading
@@ -112,23 +113,27 @@ class AdventureGUI:
         item = next((obj for obj in self.player.current_room.get_actions()[action] if obj.name == item_name), None)
         if isinstance(item, AICharacter) and action.lower() == "talk":
             self.start_talk_ai(item)
+        elif isinstance(item, Weapon) and action.lower() == "use":
+            def use_item():
+                self.use_item_with_prompt(item)
+                self.update_gui()
+            self.root.after(0, use_item)
         else:
             item.do(action)
         self.selected_action = None
         self.selected_item = None
         self.update_gui()
 
-    def move_to_room(self, room):
-        if isinstance(room, Door):
-            if room.locked:
-                messagebox.showinfo("Locked Door", "The door is locked.")
-                return
+    def use_item_with_prompt(self, item):
+        target_name = simpledialog.askstring("Use Item", "Who do you want use this on?")
+        if target_name:
+            target = Entity.get(target_name)
+            if target and self.player.in_room_items(target):
+                item.use(target)
             else:
-                linked = list(room.linked.values())
-                if linked[0] == self.player.current_room:
-                    room = linked[1]
-                else:
-                    room = linked[0]
+                print(f"There's no '{target_name}' here to use it on.")
+
+    def move_to_room(self, room):
         self.end_talk_ai()
         room.go()
         self.update_gui()
@@ -152,10 +157,6 @@ class AdventureGUI:
             self.input_entry.delete(0, "end")
             print(f"You said: {user_input}")
             threading.Thread(target=self.current_ai_character.talk, args=(user_input,), kwargs={'once': True}, daemon=True).start()
-
-    def reset_game(self):
-        self.game.do_reset()
-        self.update_gui()
 
     def redirect_stdout(self):
         sys.stdout = type('Redirector', (), {'write': lambda s, x: (self.output_text.config(state="normal"), self.output_text.insert("end", x), self.output_text.see("end"), self.output_text.config(state="disabled")), 'flush': lambda s: None})()
