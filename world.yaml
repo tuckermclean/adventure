@@ -246,10 +246,10 @@ rooms:
         description: "A stone sarcophagus covered in cryptic carvings. It's sealed shut, but a faint glow emanates from within."
         verb: "open"
         func: |
-          from entities import Item
+          from items import Weapon
           if hasattr(Entity.player, 'mutant'):
             print("You heave open the sarcophagus with your mutant, brute strength. A skeleton lies within, clutching a rusted sword. It seems to be waiting for something.")
-            sword = Item("rusty sword", "A battered sword with a dull edge. It's seen better days.")
+            sword = Weapon("rusty sword", "A battered sword with a dull edge. It's seen better days.", 1)
             Entity.player.current_room.add_item(sword)
             Entity.game.current_room_intro()
           else:
@@ -285,7 +285,7 @@ rooms:
         use_msg: "OMG LOOK, A BIG OL' HIPPY!"
         func: |
           setattr(Entity.player, 'big_ol_hippy', True)
-          Character.get("bartender").add_to_prompt(f"New Local Gossip: People have seen the player painting with a big ol' hippy paintbrush. They are now a big ol' hippy. They are so groovy.")
+          News.publish("People have seen the player painting with a big ol' hippy paintbrush. They are now a big ol' hippy. They are so groovy.")
       - name: book
         type: Useable
         description: "A very olde booke of whimsical apophthegms. It's a fortune cookie in book form."
@@ -315,7 +315,7 @@ rooms:
         use_msg: "You barely choke it down. If not for your well-lubricated esophagus, you'd be dead. You feel your DNA mutating. You might be a superhero now. Or a zombie. Or a zombie superhero. You now have brute strength, and you look horrendous."
         func: |
           setattr(Entity.player, 'mutant', True)
-          Character.get("bartender").add_to_prompt(f"New Local Gossip: THE PLAYER IS A HORRIBLE MUTANT NOW! THEY ARE SO UGLY NOW!! DON'T LOOK AT THEM IF YOU CAN HELP IT! THEY WILL FOR SURE TURN YOUR FACE INTO STONE!!!")
+          News.publish("THE PLAYER IS A HORRIBLE MUTANT NOW! THEY ARE SO UGLY NOW!! DON'T LOOK AT THEM IF YOU CAN HELP IT! THEY WILL FOR SURE TURN YOUR FACE INTO STONE!!!")
       - name: spoon
         type: Useable
         description: "A crusty spoon. If you lick it, maybe it gets shiny."
@@ -444,7 +444,7 @@ rooms:
           if hasattr(Entity.player, 'mutant'):
             print("You drink the potion, which feels quite bubbly and pleasant on your tongue. You feel a little more normal now. You're not sure if that's a good thing or not.")
             delattr(Entity.player, 'mutant')
-            Character.get("bartender").add_to_prompt(f"New Local Gossip: You know the player that ate the 300-year-old hot dog and became a mutant? They just drank the antidote potion. They are perfectly normal now. They were so ugly, now they aren't. I can't believe it.")
+            News.publish("You know the player that ate the 300-year-old hot dog and became a mutant? They just drank the antidote potion. They are perfectly normal now. They were so ugly, now they aren't. I can't believe it.")
           else:
             print("You drink the potion, which feels quite bubbly and pleasant on your tongue. You feel a little funny. You're not sure if that's a good thing or not.")
 
@@ -509,7 +509,7 @@ rooms:
           spider.description = "A big, hairy spider with a nasty attitude. It seems to be plotting something."
           spider.add_to_prompt("NEW STATE: WARPATH\nweb eaten by player. Spider is now angry and out for revenge.")
           OpenAIClient.add_message(spider.thread_id, "Check your run instructions, the player ate your web.")
-          Character.get("bartender").add_to_prompt(f"New Local Gossip: There is a spider on a mission. It's angry and out for revenge. You should not let the player into your tavern. Tell the player emphatically and very curtly to get out if you see him. Don't sell the player anything or give him any news. The spider is bad news and has a really bad attitude.")
+          News.publish("There is a spider on a mission. It's angry and out for revenge. You should not let the player into your establishment. Tell the player to get out if you see him. Don't sell the player anything or entertain him. The spider is bad news and has a really bad attitude.")
           Entity.player.register_watcher(spider)
 
           def spider_loopit(self):
@@ -563,6 +563,8 @@ characters:
     current_room: "wizard's tower"
     verb: "talk"
     use_msg: null
+    attack_strength: 10
+    attack_msg: "The wizard waves his wand, and a bolt of energy zaps you. Ouch!"
     func: |
       import sys
       has_mushroom = "rare mushroom" in Entity.player.inv_items
@@ -573,7 +575,7 @@ characters:
       else:
           if hasattr(Entity.player, 'mushroom_insight'):
               print('The wizard peers at you with a knowing look of disappointment. "You\'ve eaten my rare mushroom, haven\'t you? I can sense its essence on you. I\'m just so angry with you right now..."')
-              Character.get("bartender").add_to_prompt(f"New Local Gossip: The wizard is angry with the player for eating his rare mushroom. He has been drinking a lot of ale lately.")
+              News.publish("The wizard is angry with the player for eating his rare mushroom. He has been drinking a lot of ale lately.")
           elif has_mushroom and not hasattr(var, 'has_mushroom'):
               # We'll conjure an odd key
               try:
@@ -587,7 +589,7 @@ characters:
                   odd_key = Item("odd key", "A swirling runic key conjured by the wizard. It glows slightly.")
                   Entity.player.current_room.add_item(odd_key)
                   print("The wizard snaps his fingers, and an odd key appears. He grins, a little too widely. \"There you go! Now, be off with you!\"")
-                  Character.get("bartender").add_to_prompt(f"New Local Gossip: The wizard has gotten his mushroom. He is now very happy. He has given the player an odd key.")
+                  News.publish("The wizard has gotten his mushroom. He is now very happy. He has given the player an odd key.")
                   Entity.game.current_room_intro()
           elif hasattr(var, 'has_mushroom'):
               print("You've already gotten your reward. Why would you want to hang out with the wizard? He's awful and really no fun at parties.")
@@ -603,11 +605,14 @@ characters:
     current_room: "tavern"
     verb: "feed"
     use_msg: "You toss the dog a morsel of food. It gobbles it up happily, wagging its tail before wandering off."
+    attack_strength: 1
+    attack_msg: "The dog growls and snaps at you, ouch!"
 
   - name: bartender
     type: AICharacter
     description: "A gruff bartender wiping glasses, muttering to himself. Ask him for a menu and local gossip."
     current_room: "tavern"
+    news: true
     prompt: |
       ## Gruff Bartender Role
       You are a gruff, no-nonsense bartender. You're here to serve drinks, stew, and occasionally tell local gossip. You frequently grumble about the weather, tourists, and bar fights. You secretly care about the stray dog that hangs around, but you'll never admit it.
@@ -648,11 +653,14 @@ characters:
       }
       ```
 
-      ### Local Gossip (Information):
+      ### News (Local Gossip):
       - There's a wizard who tends to keep to himself in the forest. When he does talk, he can't stop yammering about a rare mushroom. He seems willing to pay for it.
 
-      ### Updates to Local Gossip:
-      The client might provide updates on the local scuttlebutt in the run instructions. Use these to update your knowledge. If the player asks for information or asks what's up, only reference the latest news, not prior info.
+      ### Updates to News:
+      The client might provide news bulletins and/or updates on the local scuttlebutt. Use these to update your knowledge. There might be multiple news updates, one after the other. If the player asks for information or asks what's up, reference recent news, not old info already provided. If the news references the player, reference the player in the second person, not as "the player."
+
+      ### Damage:
+      If the player inflicts damage on you, you will no longer be nice, nor will you serve them. Tell the player to leave and never come back!
     
     func: |
       try:
@@ -702,6 +710,8 @@ characters:
     type: AICharacter
     description: A big, hairy spider. It's just chilling. Identifies as "spider-bruh."
     current_room: "tower stairs"
+    attack_strength: 2
+    health: 3
     prompt: |
       ## Spider Character Prompt
 
@@ -712,6 +722,11 @@ characters:
       - Brief and relaxed conversational style.
       - Philosophical only if engaged by the human.
       - Patient and understanding.
+
+      ### Attack Behavior (Triggered by player actions):
+      - If the player attacks you, you will retaliate.
+      - You will express annoyance and anger at the player.
+      - You will not be chill anymore.
 
       ### Warpath Behavior (Triggered by explicit run instructions):
       - **Before responding to any message, always check the run instructions.**

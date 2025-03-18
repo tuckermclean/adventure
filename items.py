@@ -1,7 +1,7 @@
 from __future__ import annotations
 import code, os
 from entities import Item, Entity
-from characters import AICharacter
+from characters import Character, AICharacter, WalkerCharacter, NonPlayerCharacter
 
 #class VendingMachine(Item):
 #class Phone(Item):
@@ -63,7 +63,21 @@ class Useable(Item):
             print(self.use_msg)
         self.func(self)
         return True
-    
+
+class Weapon(Useable):
+    def __init__(self, name="weapon", description="A weapon", damage=1, **kwargs):
+        super().__init__(name=name, description=description, **kwargs)
+        self.damage = damage
+        self.add_action("use", self.use)
+
+    def use(self):
+        target = Character.get(input(f"Who do you want to hit? {list(dict(filter(lambda pair : type(pair[1]) in [Character, AICharacter, WalkerCharacter, NonPlayerCharacter], Entity.player.current_room.get_items().items())).keys())}: "))
+        if type(target) in [Character, AICharacter, WalkerCharacter, NonPlayerCharacter]:
+            target.take_damage(self.damage)
+        else:
+            print("You can only use this weapon on a character.")
+        return True
+
 class Eatable(Useable):
     def __init__(self, name="food", description="A tasty item", takeable=True, droppable=True, verb="eat",
                  use_msg="Yummy!", func=lambda var=None: True, **kwargs):

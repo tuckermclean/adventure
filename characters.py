@@ -2,9 +2,10 @@ from __future__ import annotations
 import random, re, os, time
 import openai
 from entities import Room, Item, Entity, EntityLinkException
+from news import News
 
 class Character(Item):
-    def __init__(self, name="player", description="The main player", current_room=None, lookable=True, **kwargs):
+    def __init__(self, name="player", description="The main player", health=1, attack_strength=None, damage_msg="Ouch!", attack_msg="Have at you!", current_room=None, lookable=True, **kwargs):
         Item.__init__(self, name=name, description=description, droppable=False, takeable=False, lookable=lookable)
 
         self.current_room = None
@@ -15,6 +16,11 @@ class Character(Item):
         self.wearing = {}
         self.words = ""
         self.watchers = {}
+        self.health = health
+        self.first_health = health
+        self.attack_strength = attack_strength
+        self.attack_msg = attack_msg
+        self.damage_msg = damage_msg
 
         if current_room != None and current_room.__class__ == Room:
             self.go(current_room)
@@ -63,10 +69,39 @@ class Character(Item):
     def unregister_watcher(self, watcher):
         del self.watchers[watcher.name]
 
+    def take_damage(self, damage=1, attacker=None):
+        if attacker != None and hasattr(attacker, 'name'):
+            attacker = attacker.name
+        elif attacker == None:
+            attacker = "player"
+        self.health -= damage
+        print(self.damage_msg)
+        print(f"{self.name.title()} took {damage} damage. Health: {self.health} ({self.health / self.first_health * 100:.2f}%)")
+        News.publish(f"{self.name.title()} just got hit by the {attacker.title()} and took {damage} damage. Health: {self.health} ({self.health / self.first_health * 100:.2f}%)")
+        if self.health <= 0:
+            self.die()
+        else:
+            self.attack(Entity.player)
+
+    def die(self):
+        print(f"{self.name.title()} has died.")
+        News.publish(f"{self.name.title()} has died.")
+        self.current_room.pop(self.name)
+        Entity.purge(self.name)
+        if self.name == "player":
+            print("Game over.")
+            exit()
+    
+    def attack(self, target):
+        if self.attack_strength != None:
+            print(self.attack_msg)
+            target.take_damage(damage=self.health / self.first_health * self.attack_strength, attacker=self)
+
+
 class NonPlayerCharacter(Character):
-    def __init__(self, name="npc", description="Just hanging around", current_room=None, lookable=True, verb="greet",
+    def __init__(self, name="npc", description="Just hanging around", health=2, attack_strength=None, damage_msg="Ouch!", attack_msg="Have at you!", current_room=None, lookable=True, verb="greet",
                  use_msg="Hi!", func=lambda var=None: True, **kwargs):
-        Character.__init__(self, name=name, description=description, current_room=current_room, lookable=lookable)
+        Character.__init__(self, name=name, description=description, health=health, attack_strength=attack_strength, damage_msg=damage_msg, attack_msg=attack_msg, current_room=current_room, lookable=lookable)
         self.use_msg = use_msg
         self.func = func
         self.add_action(verb, self.use)
@@ -81,9 +116,9 @@ class NonPlayerCharacter(Character):
         pass
 
 class WalkerCharacter(NonPlayerCharacter):
-    def __init__(self, name="walker", description="Just walking around", current_room=None, lookable=True, verb="greet",
+    def __init__(self, name="walker", description="Just walking around", health=2, attack_strength=None, damage_msg="Ouch!", attack_msg="Have at you!", current_room=None, lookable=True, verb="greet",
                  use_msg="Hi!", func=lambda var=None: True, **kwargs):
-        NonPlayerCharacter.__init__(self, name=name, description=description, current_room=current_room, lookable=lookable, verb=verb, use_msg=use_msg, func=func)
+        NonPlayerCharacter.__init__(self, name=name, description=description, health=health, attack_strength=attack_strength, damage_msg=damage_msg, attack_msg=attack_msg, current_room=current_room, lookable=lookable, verb=verb, use_msg=use_msg, func=func)
 
     def loopit(self):
         try:
@@ -214,12 +249,12 @@ class OpenAIClient():
         print()
 
 class AICharacter(Character):
-    def __init__(self, name="ai character", description="Some NPC", current_room=None,
+    def __init__(self, name="ai character", description="Some NPC", health=3, attack_strength=None, current_room=None,
                  prompt="You are a less-than helpful, yet amusing, assistant.",
                  phone_prompt=("The user is calling you on the phone, and you answer in an amusing way. "
                                "Don't worry about sounds or actions, just generate the words."),
                  func=lambda json: print(f"Character returned: {json}"), **kwargs):
-        super().__init__(name=name, description=description, current_room=current_room)
+        super().__init__(name=name, description=description, health=health, attack_strength=attack_strength, current_room=current_room)
         self.phoneable = phone_prompt is not None
         self.func = func
         self.add_action("talk", self.talk)
@@ -236,7 +271,26 @@ class AICharacter(Character):
             OpenAIClient.get_or_create_assistant(self.phone_assistant_name, f"{prompt} {phone_prompt}")
             self.phone_thread_id = OpenAIClient.create_thread()
 
-    def talk(self, msg=None, phone=False):
+    def take_damage(self, damage=1, attacker=None):
+        super().take_damage(damage, attacker)
+        if attacker != None and hasattr(attacker, 'name'):
+            attacker = attacker.name
+        elif attacker == None:
+            attacker = "player"
+        if self.health > 0:
+            OpenAIClient.add_message(self.thread_id, f"You just got hit by the {attacker}, and you took {damage} damage. Your health is now {self.health / self.first_health * 100:.2f}%) and you are really angry now. Don't mention your health percentage explicitly.")
+
+    def attack(self, target):
+        super().attack(target)
+        if self.attack_strength != None:
+            msg = f"You just attacked the {target.name}, and they took {self.attack_strength} damage. Their health is now {Entity.player.health / Entity.player.first_health * 100:.2f}%). Don't mention their health percentage explicitly."
+            self.talk(msg=msg, once=True)
+
+    def notify_news(self, news):
+        self.add_to_prompt(f"NEWS BULLETIN: {news}")
+        return True
+
+    def talk(self, msg=None, once=False, phone=False):
         OpenAIClient.connect()
 
         if phone and not self.phoneable:
@@ -275,7 +329,10 @@ class AICharacter(Character):
         if re.search(hangups, full_message.lower(), re.IGNORECASE) or re.search(hangups, user_message.lower(), re.IGNORECASE):
             bye = True
         elif not bye:
-            return self.talk(phone=phone)
+            if once:
+                return True
+            else:
+                return self.talk(phone=phone)
 
         if bye:
             Entity.game.current_room_intro()
@@ -291,6 +348,10 @@ class AICharacter(Character):
             return
 
         self.additional_instructions += f"\n{new_instructions}"
+        try:
+            OpenAIClient.add_message(self.thread_id, new_instructions, role="assistant")
+        except Exception as e:
+            pass
 
 def find_json_objects(text: str):
     """

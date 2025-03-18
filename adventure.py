@@ -3,6 +3,7 @@ import cmd2, os, shlex, sys, yaml
 from entities import Room, Door, Item, Entity
 from items import Money, Wearable, Useable, Eatable, Computer, Phone
 from characters import Character, AICharacter, WalkerCharacter, NonPlayerCharacter
+from news import News
 
 class Adventure(cmd2.Cmd):
     def __init__(self, player=None, file="world.yaml"):
@@ -44,8 +45,13 @@ class Adventure(cmd2.Cmd):
                             def closure(func):
                                 return lambda var=None: exec(func)
                             character['func'] = closure(character['func']) or True
-                        character_class(**character)
-                        character_class.get(character['name']).go(Room.get(character['current_room']))
+                        character_obj = character_class(**character)
+                        character_obj.go(Room.get(character['current_room']))
+                        try:
+                            if character_class == AICharacter and character['news'] == True:
+                                News.subscribe(character_obj)
+                        except:
+                            pass
                     for help in world['help']:
                         text = world['help'][help]
                         setattr(self, f"help_{help}", lambda text=text: print(text))
@@ -190,6 +196,6 @@ class Adventure(cmd2.Cmd):
         self.current_room_intro()
 
 if __name__ == '__main__':
-    player = Character(lookable=False)
+    player = Character(lookable=False, health=3)
     game = Adventure(player)
     game.cmdloop()
