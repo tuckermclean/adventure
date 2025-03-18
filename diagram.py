@@ -28,7 +28,10 @@ for room in data['rooms']:
 
 # Add doors as edges with special styling
 for door in data.get('doors', []):
-    dot.edge(door['room1'], door['room2'], label=f"Door: {door['name']}", dir='both', style='dashed', color='red')
+    if door.get('hidden', False):
+        dot.edge(door['room1'], door['room2'], label=f"Hidden Door: {door['name']}", dir='both', style='dashed', color='gray')
+    else:
+        dot.edge(door['room1'], door['room2'], label=f"Door: {door['name']}", dir='both', style='dashed', color='red')
 
 # Add items grouped into a single node
 for room in data['rooms']:

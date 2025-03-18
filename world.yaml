@@ -164,6 +164,19 @@ rooms:
           
           Selene lingered alone among the ruins, a hero no longer, carrying the weight of a world saved but forever lost.""")
 
+  - name: arion's tomb
+    description: "A hidden tomb shrouded in mist. The air is thick with sorrow, and the ground is littered with broken stones."
+    links: []
+    items:
+      - name: crypt
+        type: Item
+        description: "A stone crypt with intricate carvings, hinting at a tragic tale of betrayal and sacrifice."
+        takeable: false
+      - name: arion's sword
+        type: Weapon
+        description: "A magically gleaming sword, strangely preserved. It seems to hum with a forgotten power."
+        damage: 5
+
   - name: hidden waterfall
     description: "A tumbling cascade of water concealed behind dense foliage. The spray cools the air, creating rainbows in dappled sunlight."
     links:
@@ -543,6 +556,13 @@ doors:
     key: tower key
     room1: tower stairs
     room2: tower
+
+  - name: hidden door
+    hidden: true
+    locked: false
+    room1: arion's tomb
+    room2: ancient ruin
+    condition: hasattr(Entity.player, 'mushroom_insight') or hasattr(Entity.player, 'potion_insight')
 
 characters:
   - name: wizard

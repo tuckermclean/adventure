@@ -1,7 +1,7 @@
 from __future__ import annotations
 import cmd2, os, shlex, sys, yaml
-from entities import Room, Door, Item, Entity
-from items import Money, Wearable, Useable, Eatable, Computer, Phone
+from entities import Room, Door, HiddenDoor, Item, Entity
+from items import Money, Wearable, Useable, Eatable, Computer, Phone, Weapon
 from characters import Character, AICharacter, WalkerCharacter, NonPlayerCharacter
 from news import News
 
@@ -38,7 +38,14 @@ class Adventure(cmd2.Cmd):
                             door['key'] = Item.get(door['key'])
                         except:
                             pass
-                        Door(**door)
+                        if door.get('hidden', False):
+                            if 'condition' in door:
+                                def closure(condition):
+                                    return lambda var=None: eval(condition)
+                                door['condition'] = closure(door['condition']) or True
+                            HiddenDoor(**door)
+                        else:
+                            Door(**door)
                     for character in world['characters']:
                         character_class = globals()[character['type']]
                         if 'func' in character:
@@ -124,7 +131,11 @@ class Adventure(cmd2.Cmd):
             return []
 
         # Gather possible item names for this action
-        possible_items = [entity_item.name for entity_item in actions_dict[action]]
+        possible_items = [
+            entity_item.name for entity_item in actions_dict[action]
+            if not isinstance(entity_item, HiddenDoor)
+            or (isinstance(entity_item, HiddenDoor) and entity_item.condition())
+        ]
 
         # Filter:
         # 1) Must start with item_partial

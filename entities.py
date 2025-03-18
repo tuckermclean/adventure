@@ -210,10 +210,11 @@ class Room(Entity):
             return dict(filter(lambda pair : isinstance(pair[1], Item), self.linked.items()))
 
     def get_rooms(self):
-        return dict(filter(lambda pair : isinstance(pair[1], Room), self.linked.items()))
+        # If the room is a HiddenDoor, don't return it if condition() is False
+        return dict(filter(lambda pair : (isinstance(pair[1], Room) and not isinstance(pair[1], HiddenDoor)) or (isinstance(pair[1], HiddenDoor) and pair[1].condition()), self.linked.items()))
 
     def get_doors(self):
-        return dict(filter(lambda pair : isinstance(pair[1], Door), self.linked.items()))
+        return dict(filter(lambda pair : (isinstance(pair[1], Door) and not isinstance(pair[1], HiddenDoor)) or (isinstance(pair[1], HiddenDoor) and pair[1].condition()), self.linked.items()))
 
     def get_actions(self):
         actions = {}
@@ -303,3 +304,15 @@ class Door(Room):
             print("That door isn't here")
         return True
 
+class HiddenDoor(Door):
+    """A door that is hidden and will only show when a certain condition is met"""
+    def __init__(self, name: str, room1: Room, room2: Room, condition: lambda var=None: bool, **kwargs):
+        super().__init__(name, room1, room2, **kwargs)
+        self.condition = condition
+
+    def go(self):
+        if self.condition():
+            super().go()
+        else:
+            print("The door is hidden and cannot be accessed yet.")
+        return True
