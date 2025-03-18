@@ -54,26 +54,15 @@ rooms:
     links:
       - village square
       - forest clearing
-      - forest entrance
     items:
       - name: signpost
         type: Item
         description: "A wooden sign with faded lettering: 'Beware the forest beyond. Mystery abounds.'"
 
-  - name: forest entrance
-    description: "You stand at the threshold of a dense forest. Towering trees block out the sun, and the smell of moss is thick in the air."
-    links:
-      - forest road
-      - old oak clearing
-    items:
-      - name: warning sign
-        type: Item
-        description: "A tattered sign nailed to a tree: 'Enter at your own risk. The forest does not forgive foolish hearts.'"
-
   - name: old oak clearing
     description: "An ancient oak stands in the center. Its trunk is massive, and a rope swing dangles invitingly from a sturdy branch."
     links:
-      - forest entrance
+      - spooky house
       - enchanted pond
     items:
       - name: rope swing
@@ -269,7 +258,6 @@ rooms:
     description: "A grand foyer with a high ceiling and a dusty whatever-it-is on the ceiling. Goofy footprints in the dust suggest recent paranormal activity."
     links:
       - living room
-      - library
     items: []
 
   - name: living room
@@ -431,8 +419,8 @@ rooms:
   - name: library
     description: "A quiet library filled with dusty tomes. A ladder on rails runs along massive bookshelves."
     links:
-      - foyer
       - hallway
+      - tower
       - secret study
     items:
       - name: antidote potion
