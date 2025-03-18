@@ -11,52 +11,40 @@ dot.attr(rankdir='LR')
 
 # Add rooms as nodes
 for room in data['rooms']:
-    dot.node(room['name'], room['name'])
+    # Highlight the starting room (first room in the list)
+    if room == data['rooms'][0]:
+        dot.node(room['name'], room['name'], style='filled', fillcolor='lightblue')
+    else:
+        dot.node(room['name'], room['name'])
 
-# Add links between rooms
+# Add links between rooms, ensuring only one edge per pair
+added_edges = set()
 for room in data['rooms']:
     for link in room.get('links', []):
-        dot.edge(room['name'], link)
+        edge = tuple(sorted([room['name'], link]))
+        if edge not in added_edges:
+            dot.edge(edge[0], edge[1], dir='both')
+            added_edges.add(edge)
 
 # Add doors as edges with special styling
 for door in data.get('doors', []):
-    dot.edge(door['room1'], door['room2'], label=f"Door: {door['name']}", style='dashed', color='red')
+    dot.edge(door['room1'], door['room2'], label=f"Door: {door['name']}", dir='both', style='dashed', color='red')
 
-# Add items as subnodes
+# Add items grouped into a single node
 for room in data['rooms']:
+    items = []
+    item_node_id = f"{room['name']}_items"
     for item in room.get('items', []):
-        dot.node(f"{room['name']}_{item['name']}", item['name'], shape='box')
-        dot.edge(room['name'], f"{room['name']}_{item['name']}", style='dotted')
-        # Add item actions as text labels
-        if item['type'] in ['Item', 'Wearable', 'Eatable', 'Weapon', 'Money'] and item.get('takeable', True):
-            dot.node(f"{room['name']}_{item['name']}_take", "take", shape='plaintext')
-            dot.edge(f"{room['name']}_{item['name']}", f"{room['name']}_{item['name']}_take", style='dotted')
-        if 'verb' in item:
-            dot.node(f"{room['name']}_{item['name']}_{item['verb']}", item['verb'], shape='plaintext')
-            dot.edge(f"{room['name']}_{item['name']}", f"{room['name']}_{item['name']}_{item['verb']}", style='dotted')
-        else:
-            if item['type'] in ['Useable', 'Computer', 'Phone', 'Weapon']:
-                dot.node(f"{room['name']}_{item['name']}_use", "use", shape='plaintext')
-                dot.edge(f"{room['name']}_{item['name']}", f"{room['name']}_{item['name']}_use", style='dotted')
-            elif item['type'] == 'Wearable':
-                dot.node(f"{room['name']}_{item['name']}_wear", "wear", shape='plaintext')
-                dot.edge(f"{room['name']}_{item['name']}", f"{room['name']}_{item['name']}_wear", style='dotted')
-            elif item['type'] == 'Eatable':
-                dot.node(f"{room['name']}_{item['name']}_eat", "eat", shape='plaintext')
-                dot.edge(f"{room['name']}_{item['name']}", f"{room['name']}_{item['name']}_eat", style='dotted')
+        items.append(item['name'])
+    if items:
+        dot.node(item_node_id, '\n'.join(items), shape='box', color='green')
+        dot.edge(room['name'], item_node_id, style='dotted', dir='none')
 
-# Add characters as subnodes
+# Add characters
 for character in data.get('characters', []):
-    dot.node(f"{character['current_room']}_{character['name']}", character['name'], shape='ellipse', color='lightblue')
-    dot.edge(character['current_room'], f"{character['current_room']}_{character['name']}", style='dotted')
-    # Add item actions as text labels
-    if 'verb' in character:
-        dot.node(f"{character['current_room']}_{character['name']}_{character['verb']}", character['verb'], shape='plaintext')
-        dot.edge(f"{character['current_room']}_{character['name']}", f"{character['current_room']}_{character['name']}_{character['verb']}", style='dotted')
-    elif character['type'] == 'AICharacter':
-        dot.node(f"{character['current_room']}_{character['name']}_talk", "talk", shape='plaintext')
-        dot.edge(f"{character['current_room']}_{character['name']}", f"{character['current_room']}_{character['name']}_talk", style='dotted')
-
+    char_node_id = f"{character['current_room']}_{character['name']}"
+    dot.node(char_node_id, character['name'], shape='ellipse', color='blue')
+    dot.edge(character['current_room'], char_node_id, style='dotted', dir='none')
 
 # Generate and save the diagram
 dot.render('adventure_world_diagram', view=True)
