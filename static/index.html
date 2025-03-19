@@ -5,78 +5,265 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Adventure Game</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 20px; }
-        #output { white-space: pre-wrap; background: #222; color: #fff; padding: 10px; height: 300px; overflow-y: auto; }
-        input { width: 80%; padding: 10px; margin-top: 10px; }
-        button { padding: 10px; }
+        body { font-family: Arial, sans-serif; text-align: center; }
+        #game-container { max-width: 600px; margin: auto; padding: 0 20px 20px; border: 1px solid #ccc; border-radius: 10px; }
+        #location { color: white; background: rgba(0,0,0,0.5); position: relative; top: 270px; font-size: 24px; font-weight: bold; line-height: 30px; border-radius: 0 0 10px 10px; }
+        #room-image { width: 100%; height: 300px; background-color: #eee; background-position: center; background-size: cover; border-radius: 10px; }
+        #actions, #items, #adjacent-rooms, #inventory { margin-top: 10px; border: 1px solid #ccc; padding: 20px 5px; border-radius: 5px; }
+        span.buttons { display: block; margin: 15px 5px; line-height: 50px;}
+        span.label { font-weight: bold; color: grey; padding: 5px; }
+        button { margin: 5px; padding: 10px; cursor: pointer; }
+        button.selected { background-color: blue; color: white; }
+        #logs { border: 1px solid grey; padding: 10px; height: 150px; overflow-y: auto; white-space: pre-wrap; font-family: monospace; margin-top: 10px; text-align: left;}
+        #ai-input-container { margin-top: 10px; }
     </style>
 </head>
 <body>
-    <h1>Adventure Game</h1>
-    <div id="output">Welcome! Loading the game...</div>
-    <input type="text" id="commandInput" placeholder="Type a command..." autofocus>
-    <button onclick="handleInput()">Submit</button>
+    <div id="game-container">
+        <div id="room-image">
+            <p id="location">Loading...</p>
+        </div>
+        <p id="description"></p>
+
+        <span class="buttons">
+            <span class="label">Actions</span>
+            <span id="actions"></span>
+        </span>
+
+        <span class="buttons">
+            <span class="label">Items</span>
+            <span id="items"></span>
+        </span>
+
+        <span class="buttons">
+            <span class="label">Adjacent Rooms</span>
+            <span id="adjacent-rooms"></span>
+        </span>
+
+        <span class="buttons">
+            <span class="label">Inventory</span><span id="inventory"></span><span class="label">Money: $<span id="money"></span></span>
+        </span>
+
+        <div id="logs"></div>
+
+        <!-- AI Chat Input -->
+        <div id="ai-input-container">
+            <span class="label">Talking to <span id="ai-character-name"></span></span>
+            <input type="text" id="ai-input" placeholder="Type your message..." />
+            <button onclick="sendMessageToAI()">Send</button>
+        </div>
+    </div>
 
     <script>
-        let awaitingUserInput = false; // Tracks if the game is waiting for input
+        let selectedAction = null;
+        let selectedItem = null;
+        let currentAICharacter = null;
+        let gameData = {}
+        let logIntervalId = null;
+        let logInterval = 2000;
 
-        async function handleInput() {
-            let inputBox = document.getElementById("commandInput");
-            let input = inputBox.value.trim();
-            if (!input) return;
+        async function fetchGameState() {
+            const response = await fetch('/state');
+            gameData = await response.json();
 
-            inputBox.value = ""; // Clear input
+            document.getElementById("location").innerText = gameData.location;
+            document.getElementById("description").innerText = gameData.description;
 
-            if (awaitingUserInput) {
-                // If the game is waiting for input, send to /submit_input
-                awaitingUserInput = false; // Reset the flag
-                await submitUserInput(input);
+            updateUI();
+        }
+
+        function updateUI() {
+            let availableActions = gameData.actions;
+            let availableItems = gameData.items;
+            let availableInventory = gameData.inventory;
+
+            if (selectedAction) {
+                availableItems = {};
+                for (const [key, value] of Object.entries(gameData.items)) {
+                    if (value.includes(selectedAction)) {
+                        availableItems[key] = value;
+                    }
+                }
+                availableInventory = {};
+                for (const [key, value] of Object.entries(gameData.inventory)) {
+                    if (value.includes(selectedAction)) {
+                        availableInventory[key] = value;
+                    }
+                }
             } else {
-                // Otherwise, send command normally
-                await sendCommand(input);
+                availableItems = gameData.items;
+            }
+            if (selectedItem) {
+                availableActions = {};
+                for (const [key, value] of Object.entries(gameData.actions)) {
+                    if (value.includes(selectedItem)) {
+                        availableActions[key] = value;
+                    }
+                }
+            } else {
+                availableActions = gameData.actions;
+            }
+
+            renderButtons("actions", availableActions, selectAction, selectedAction);
+            renderButtons("items", availableItems, selectItem, selectedItem);
+            renderButtons("adjacent-rooms", gameData.adjacent_rooms, moveToRoom);
+            renderButtons("inventory", availableInventory, selectItem, selectedItem);
+            // The image is the room name, with spaces and ' replaced by underscores
+            document.getElementById("room-image").style.backgroundImage = `url('/images/${gameData.location.replace(/ /g, "_").replace(/'/g, "_")}.jpeg')`;
+            // Format money as a number with commas and two decimal places
+            gameData.money = parseFloat(gameData.money).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            document.getElementById("money").innerText = gameData.money;
+            fetchLogs();
+        }
+
+        function renderButtons(containerId, items, callback, selectedItem = null) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = "";
+            Object.keys(items).forEach(item => {
+                const button = document.createElement("button");
+                button.innerText = item;
+                button.onclick = () => callback(item);
+                if (item === selectedItem) {
+                    button.classList.add("selected");
+                }
+                container.appendChild(button);
+            });
+        }
+
+        function selectAction(action) {
+            selectedAction = selectedAction === action ? null : action;
+
+            updateUI();
+            checkAndExecute();
+        }
+
+        function selectItem(item) {
+            selectedItem = selectedItem === item ? null : item;
+
+            updateUI();
+            checkAndExecute();
+        }
+
+        async function checkAndExecute() {
+            if (selectedAction && selectedItem) {
+                await executeAction(selectedAction, selectedItem);
+                selectedAction = null;
+                selectedItem = null;
+                fetchGameState();
             }
         }
 
-        async function sendCommand(command) {
-            let response = await fetch("/command", {
+        async function executeAction(action, item) {
+            const response = await fetch('/action', {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ command: command })
+                body: JSON.stringify({ action: action, item: item })
             });
+            const data = await response.json();
 
-            let result = await response.json();
-            updateOutput("> " + command + "\n" + result.response);
-
-            // If the response suggests the game is waiting for input, set the flag
-            if (result.response.includes("?") || result.response.includes("What will you say")) {
-                awaitingUserInput = true;
+            if (data.talking) {
+                startConversation(item);
             }
         }
 
-        async function submitUserInput(userInput) {
-            let response = await fetch("/submit_input", {
+        async function moveToRoom(room) {
+            await fetch('/move', {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ user_input: userInput })
+                body: JSON.stringify({ room: room })
+            });
+            selectedAction = null;
+            selectedItem = null;
+            endConversation();
+            fetchGameState();
+        }
+
+        function startConversation(characterName) {
+            currentAICharacter = characterName;
+            document.getElementById("ai-character-name").innerText = characterName;
+            document.getElementById("ai-input-container").style.display = "block";
+            document.getElementById("ai-input").focus();
+            // When the user presses Enter, send the message
+            document.getElementById("ai-input").onkeydown = (e) => {
+                if (e.key === "Enter") {
+                    sendMessageToAI();
+                }
+            };
+        }
+
+        async function sendMessageToAI() {
+            const inputField = document.getElementById("ai-input");
+            // Disable the input field while waiting for the response
+            inputField.disabled = true;
+            const message = inputField.value.trim();
+
+            if (!message) return;
+
+            addLog(`You: ${message}`);
+
+            logInterval = 200;
+            const response = await fetch('/talk', {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    talking_to: document.getElementById("ai-character-name").innerText,
+                    message: message
+                })
             });
 
-            let result = await response.json();
-            updateOutput("> " + userInput + "\n" + result.response);
+            const data = await response.json();
+            console.log("AI Response:", data.response);
+            fetchLogs();
+
+            inputField.value = "";
+            logInterval = 2000;
+            fetchGameState();
+            inputField.disabled = false;
         }
 
-        function updateOutput(text) {
-            let outputDiv = document.getElementById("output");
-            outputDiv.innerText += "\n" + text;
-            outputDiv.scrollTop = outputDiv.scrollHeight;
+        async function endConversation() {
+            if (!currentAICharacter) return;
+            await fetch('/end_talk', { method: "POST" });
+            document.getElementById("ai-input-container").style.display = "none";
+            currentAICharacter = null;
         }
 
-        async function startGame() {
-            let response = await fetch("/start");
-            let result = await response.json();
-            updateOutput(result.room_description);
+        function addLog(log) {
+            const logDiv = document.getElementById("logs");
+            // Create a span element for the log
+            const logSpan = document.createElement("span");
+
+            log.replace(/\\n/g, "<br/>");
+            logSpan.innerText = log;
+            logDiv.appendChild(logSpan);
+ 
+            // Set the span to have a yellow background that fades to white
+            logSpan.style.backgroundColor = "yellow";
+            logSpan.style.transition = "background-color 2s";
+            setTimeout(() => {
+                logSpan.style.backgroundColor = "white";
+            }, 100);
+
+            logDiv.scrollTop = logDiv.scrollHeight;
         }
 
-        startGame();
+        async function fetchLogs() {
+            const response = await fetch('/logs');
+            const data = await response.json();
+            if (data.logs.length > 0) {
+                const logDiv = document.getElementById("logs");
+                data.logs.forEach(log => {
+                    addLog(log);
+                });
+            }
+            if (logIntervalId) {
+                clearInterval(logIntervalId);
+            }
+            logIntervalId = setInterval(fetchLogs, logInterval);
+        }
+
+        fetchGameState();
+        fetchLogs();
     </script>
 </body>
 </html>
