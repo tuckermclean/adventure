@@ -243,6 +243,8 @@ class AdventureGUI:
     def send_input(self, event):
         if self.awaiting_input:
             user_input = self.input_entry.get()
+            if not user_input.strip():
+                return
             self.input_entry.delete(0, "end")
             print(f"You said: {user_input}")
             threading.Thread(target=self.current_ai_character.talk, args=(user_input,), kwargs={'once': True}, daemon=True).start()
