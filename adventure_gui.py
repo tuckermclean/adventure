@@ -29,7 +29,12 @@ class AdventureGUI:
         self.redirect_stdout()
         self.update_gui()
 
-        Entity.game.current_room_intro = self.update_gui
+        Entity.game.current_room_intro = self.current_room_intro
+
+    def current_room_intro(self):
+        for char in dict(filter(lambda pair : Entity.player.in_room_items(pair[1]), Character.get_all().items())).values():
+            char.loopit()
+        self.update_gui()
 
     def create_widgets(self):
         self.image_frame = tk.Frame(self.root, height=300, width=600)
@@ -83,15 +88,22 @@ class AdventureGUI:
         actions_dict = current_room.get_actions()
         actions = set(actions_dict.keys()) - {"go"}
         items = set(item.name for sublist in actions_dict.values() for item in sublist) - self.player.inv_items.keys() - current_room.get_rooms(show_hidden=True).keys()
+        inv_items = set(self.player.inv_items.keys())
 
         # Label for actions:
         tk.Label(self.action_buttons_frame, text="Actions:").pack(side="left", padx=5)
 
-        if self.selected_action:
-            items = set(item.name for item in actions_dict[self.selected_action])
-        if self.selected_item:
-            actions = {action for action, objs in actions_dict.items() if any(obj.name == self.selected_item for obj in objs)}
-
+        try:
+            if self.selected_action:
+                items = set(item.name for item in actions_dict[self.selected_action])
+                inv_items = set(item.name for item in actions_dict[self.selected_action])
+            if self.selected_item:
+                actions = {action for action, objs in actions_dict.items() if any(obj.name == self.selected_item for obj in objs)}
+        except KeyError:
+            self.selected_action = None
+            self.selected_item = None
+            return self.update_gui()
+    
         for action in actions:
             if action == self.selected_action:
                 btn = tk.Button(self.action_buttons_frame, text=action,
@@ -128,9 +140,13 @@ class AdventureGUI:
         # Label for inventory:
         tk.Label(self.inventory_frame, text="Inventory:").pack(side="left", padx=5)
 
-        for inv_item in self.player.inv_items.values():
-            lbl = tk.Button(self.inventory_frame, text=inv_item.name,
-                            command=lambda i=inv_item: self.select_item(i.name))
+        for inv_item in inv_items:
+            if inv_item == self.selected_item:
+                lbl = tk.Button(self.inventory_frame, text=inv_item,
+                            command=lambda i=inv_item: self.select_item(i), background="blue")
+            else:
+                lbl = tk.Button(self.inventory_frame, text=inv_item,
+                            command=lambda i=inv_item: self.select_item(i))
             lbl.pack(side="left", padx=5)
         
         # Label for money:

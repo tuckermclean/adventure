@@ -13,12 +13,12 @@ rooms:
         verb: "toss"
         use_msg: "You toss some water in the air. Nobody seems impressed."
         takeable: false
-      - name: payphone
-        type: Phone
-        description: "A battered payphone perched strangely in the middle of the village square. Possibly the only phone around."
-        cost: 0.25
-        costmsg: "Out of quarters? Sorry, the phone won't budge."
-        mobile: false
+      #- name: payphone
+      #  type: Phone
+      #  description: "A battered payphone perched strangely in the middle of the village square. Possibly the only phone around."
+      #  cost: 0.25
+      #  costmsg: "Out of quarters? Sorry, the phone won't budge."
+      #  mobile: false
 
   - name: shop
     description: "A cramped general store with shelves overflowing with odds and ends. A faint smell of mothballs permeates the stale air."
@@ -59,6 +59,7 @@ rooms:
       - name: signpost
         type: Item
         description: "A wooden sign with faded lettering: 'Beware the forest beyond. Mystery abounds.'"
+        takeable: false
 
   - name: old oak clearing
     description: "An ancient oak stands in the center. Its trunk is massive, and a rope swing dangles invitingly from a sturdy branch."
@@ -94,6 +95,7 @@ rooms:
         description: "A decaying log with a large hollow inside. Something might be lurking within."
         verb: "inspect"
         use_msg: "You peer into the log's damp interior. It's dark and smells like rotting leaves."
+        takeable: false
       - name: rare mushroom
         type: Eatable
         description: "A peculiar mushroom with swirling purple spots. It looks both delicious and dangerous."
@@ -179,7 +181,7 @@ rooms:
       - name: arion's sword
         type: Weapon
         description: "A magically gleaming sword, strangely preserved. It seems to hum with a forgotten power."
-        damage: 5
+        damage: 3
 
   - name: hidden waterfall
     description: "A tumbling cascade of water concealed behind dense foliage. The spray cools the air, creating rainbows in dappled sunlight."
@@ -251,6 +253,7 @@ rooms:
         type: Useable
         description: "A stone sarcophagus covered in cryptic carvings. It's sealed shut, but a faint glow emanates from within."
         verb: "open"
+        takeable: false
         func: |
           from items import Weapon
           if hasattr(Entity.player, 'mutant'):
@@ -723,7 +726,7 @@ characters:
     description: A big, hairy spider. It's just chilling. Identifies as "spider-bruh."
     current_room: "tower stairs"
     attack_strength: 2
-    health: 3
+    health: 10
     prompt: |
       ## Spider Character Prompt
 

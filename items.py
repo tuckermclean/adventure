@@ -12,7 +12,7 @@ class Money(Item):
         self.amount = amount
         self.add_action("take", self.take)
     
-    def take(self):
+    def take(self, **kwargs):
         Entity.player.current_room.pop(self.name)
         Entity.player.money = Entity.player.money + self.amount
         Entity.game.current_room_intro()
