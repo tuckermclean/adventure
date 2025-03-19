@@ -155,6 +155,8 @@ rooms:
         description: "A moss-covered tablet with faded carvings, telling a near-forgotten story."
         verb: "read"
         use_msg: |
+          You trace the carvings with your fingers, and the story unfolds in your mind:
+          -------------
           The hero Arion, with silver eyes, traveled across distant mountains to slay monsters born from shadow. Alongside him walked his companion Selene—a woman of great wisdom, whose heart knew no fear.
 
           In forests of crystal, they faced the serpent Rimewyrm whose breath turned rivers into ice. Beneath crimson skies, they defeated the beast Dreamrender whose roar shattered dreams. Their legend grew with every victory, binding their fates tighter.

@@ -248,7 +248,36 @@ class AdventureGUI:
             threading.Thread(target=self.current_ai_character.talk, args=(user_input,), kwargs={'once': True}, daemon=True).start()
 
     def redirect_stdout(self):
-        sys.stdout = type('Redirector', (), {'write': lambda s, x: (self.output_text.config(state="normal"), self.output_text.insert("end", x), self.output_text.see("end"), self.output_text.config(state="disabled")), 'flush': lambda s: None})()
+        class TextRedirector:
+            def __init__(self, widget, root):
+                self.widget = widget
+                self.root = root
+
+            def write(self, text):
+                self.widget.config(state="normal")
+
+                # Insert new text with a yellow highlight
+                self.widget.insert("end", text, "highlight")
+
+                # Ensure new text is visible
+                self.widget.see("end")
+                self.widget.config(state="disabled")
+
+                # Schedule removal of highlight after 3 seconds
+                self.root.after(3000, self.remove_highlight)
+
+            def remove_highlight(self):
+                self.widget.config(state="normal")
+                self.widget.tag_remove("highlight", "1.0", "end")
+                self.widget.config(state="disabled")
+
+            def flush(self):
+                pass
+
+        sys.stdout = TextRedirector(self.output_text, self.root)
+
+        # Configure the tag for highlighting new text with a yellow background
+        self.output_text.tag_configure("highlight", background="yellow")
 
 if __name__ == '__main__':
     root = tk.Tk()
