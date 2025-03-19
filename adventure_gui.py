@@ -11,10 +11,8 @@ import sys
 import threading
 
 class AdventureGUI:
-    def __init__(self, root, adventure_game):
+    def __init__(self, root, adventure_game=None):
         self.root = root
-        self.game = adventure_game
-        self.player = Entity.player
 
         self.root.title("Adventure Game")
         self.root.geometry('600x800')
@@ -26,13 +24,17 @@ class AdventureGUI:
         self.selected_item = None
 
         self.create_widgets()
-        self.redirect_stdout()
-        self.update_gui()
+        if adventure_game:
+            self.set_game(adventure_game)
 
-        Entity.game.current_room_intro = self.current_room_intro
+    def set_game(self, adventure_game):
+        self.game = adventure_game
+        self.player = self.game.player
+        self.update_gui()
+        self.game.current_room_intro = self.current_room_intro
 
     def current_room_intro(self):
-        for char in dict(filter(lambda pair : Entity.player.in_room_items(pair[1]), Character.get_all().items())).values():
+        for char in dict(filter(lambda pair : self.player.in_room_items(pair[1]), Character.get_all(world=self.game.world).items())).values():
             char.loopit()
         self.update_gui()
 
@@ -150,7 +152,7 @@ class AdventureGUI:
             lbl.pack(side="left", padx=5)
         
         # Label for money:
-        tk.Label(self.inventory_frame, text=f"Money: ${'{:.2f}'.format(Entity.player.money)}").pack(side="left", padx=5)
+        tk.Label(self.inventory_frame, text=f"Money: ${'{:.2f}'.format(self.player.money)}").pack(side="left", padx=5)
 
     def update_room_image(self, room):
         image_path = f"images/{room.name.lower().replace(' ', '_').replace("'", '_')}.jpeg"
@@ -249,42 +251,31 @@ class AdventureGUI:
             print(f"You said: {user_input}")
             threading.Thread(target=self.current_ai_character.talk, args=(user_input,), kwargs={'once': True}, daemon=True).start()
 
-    def redirect_stdout(self):
-        class TextRedirector:
-            def __init__(self, widget, root):
-                self.widget = widget
-                self.root = root
+    def output(self, text):
+        self.output_text.config(state="normal")
 
-            def write(self, text):
-                self.widget.config(state="normal")
+        # Insert new text with a yellow highlight
+        self.output_text.insert("end", text, "highlight")
 
-                # Insert new text with a yellow highlight
-                self.widget.insert("end", text, "highlight")
+        # Ensure new text is visible
+        self.output_text.see("end")
+        self.output_text.config(state="disabled")
 
-                # Ensure new text is visible
-                self.widget.see("end")
-                self.widget.config(state="disabled")
+        # Schedule removal of highlight after 3 seconds
+        self.root.after(3000, remove_highlight)
 
-                # Schedule removal of highlight after 3 seconds
-                self.root.after(3000, self.remove_highlight)
-
-            def remove_highlight(self):
-                self.widget.config(state="normal")
-                self.widget.tag_remove("highlight", "1.0", "end")
-                self.widget.config(state="disabled")
-
-            def flush(self):
-                pass
-
-        sys.stdout = TextRedirector(self.output_text, self.root)
+        def remove_highlight(self):
+            self.output_text.config(state="normal")
+            self.output_text.tag_remove("highlight", "1.0", "end")
+            self.output_text.config(state="disabled")
 
         # Configure the tag for highlighting new text with a yellow background
         self.output_text.tag_configure("highlight", background="yellow")
 
 if __name__ == '__main__':
     root = tk.Tk()
-    player = Character(lookable=False, health=3)
-    Entity.set_player(player)
-    adventure_game = Adventure(player)
-    gui = AdventureGUI(root, adventure_game)
+    player = Character(lookable=False, health=3, warn=False)
+    gui = AdventureGUI(root)
+    adventure_game = Adventure(player=player, output=gui.output)
+    gui.set_game(adventure_game)
     root.mainloop()

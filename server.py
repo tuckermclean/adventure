@@ -1,46 +1,72 @@
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, request, jsonify, send_from_directory, session
 from flask_cors import CORS
 from characters import Character, AICharacter
 from entities import Entity, Room, HiddenDoor
 from items import Weapon
 from adventure import Adventure
-import sys
-import io
+import sys, io, uuid, copy
 
 app = Flask(__name__, static_url_path='', static_folder='static')
 CORS(app)  # Enable CORS for all routes
 
 app.secret_key = "supersecretkey"  # Replace with a secure key
 
-# Initialize the game
-player = Character(lookable=False, health=3)
-Entity.set_player(player)
-adventure_game = Adventure(player)
-adventure_game.current_room_intro = lambda: None  # Disable intro for the server
 # Global log buffer
-log_buffer = []
+log_buffers = {}
+games = {}
 
-class StdoutBuffer(io.StringIO):
-    """ Redirects stdout to capture printed messages in a buffer. """
-    def write(self, message):
-        super().write(message)
-        log_buffer.append(message)  # Store log messages in the global buffer
+def create_new_game():
+    """Creates a new game instance for a session."""
+    
+    session['game_id'] = str(uuid.uuid4())  # Assign a unique game ID
 
-    def flush(self):
-        pass
+    # Copy the empty game to create a new game instance
+    game = Adventure(output=lambda x, end="\n", flush=None: log_buffers[session['game_id']].append(str(x)+str(end)))
 
-sys.stdout = StdoutBuffer()  # Redirect stdout to custom buffer
+    player = game.player
+    world = game.world
+
+    def current_room_intro():
+        for char in dict(filter(lambda pair : game.player.in_room_items(pair[1]), Character.get_all(world=game.world).items())).values():
+            char.loopit()
+
+    game.current_room_intro = current_room_intro
+
+    if not games.get(session['game_id']):
+        games[session['game_id']] = game
+
+@app.before_request
+def ensure_game_session():
+    """Ensures each session has its own game state."""
+    if 'game_id' not in session:
+        create_new_game()
+
+# class StdoutBuffer(io.StringIO):
+#     """ Redirects stdout to capture printed messages in a buffer. """
+#     def write(self, message):
+#         super().write(message)
+#         log_buffer.append(message)  # Store log messages in the global buffer
+
+#     def flush(self):
+#         pass
+
+# sys.stdout = StdoutBuffer()  # Redirect stdout to custom buffer
 
 def get_game_state():
     """Fetches the current game state for the player."""
-    current_room = Entity.player.current_room
+    try:
+        current_room = games[session['game_id']].player.current_room
+    except KeyError:
+        create_new_game()
+
+        current_room = games[session['game_id']].player.current_room
     actions_dict = current_room.get_actions()
 
     # Create mappings of valid actions per item and valid items per action
     item_to_actions = {}
     action_to_items = {}
     inventory_items = {
-        item_name: [] for item_name, item in Entity.player.inv_items.items()
+        item_name: [] for item_name, item in games[session['game_id']].player.inv_items.items()
     }
 
     for action, objects in actions_dict.items():
@@ -74,27 +100,47 @@ def get_game_state():
         "items": item_to_actions,  # Maps items to valid actions
         "inventory": inventory_items,
         "adjacent_rooms": adjacent_rooms,
-        "money": round(Entity.player.money, 2),
+        "money": round(games[session['game_id']].player.money, 2),
     }
 
 @app.route('/')
 def serve_index():
     """Serve the main index.html file."""
+    try:
+        games[session['game_id']]
+    except KeyError:
+        create_new_game()
+
     return send_from_directory('static', 'index.html')
 
 @app.route('/images/<path:filename>')
 def serve_images(filename):
     """Serve images from the images directory."""
+    try:
+        games[session['game_id']]
+    except KeyError:
+        create_new_game()
+
     return send_from_directory('images', filename)
 
 @app.route('/state', methods=['GET'])
 def game_state():
     """API to get the current game state."""
+    try:
+        games[session['game_id']]
+    except KeyError:
+        create_new_game()
+
     return jsonify(get_game_state())
 
 @app.route('/action', methods=['POST'])
 def perform_action():
     """API to perform an action in the game."""
+    try:
+        games[session['game_id']]
+    except KeyError:
+        create_new_game()
+
     data = request.json
     action = data.get("action")
     item_name = data.get("item")
@@ -102,7 +148,7 @@ def perform_action():
     if not action:
         return jsonify({"error": "Action is required"}), 400
 
-    current_room = Entity.player.current_room
+    current_room = games[session['game_id']].player.current_room
     actions_dict = current_room.get_actions()
 
     if action not in actions_dict:
@@ -118,12 +164,12 @@ def perform_action():
         return jsonify({"message": "Choose a target.", "targets": [e.name for e in current_room.get_items().values() if isinstance(e, Character) and e != Entity.player]})
 
     elif action.lower() == "look":
-        print(item)
+        games[session['game_id']].output(item)
         return jsonify({"message": str(item)})
 
     elif action.lower() == "take":
         item.take(look=False)
-        print(f"You took {item.name}.")
+        games[session['game_id']].output(f"You took {item.name}.")
         return jsonify({"message": f"You took {item.name}."})
 
     else:
@@ -133,13 +179,18 @@ def perform_action():
 @app.route('/move', methods=['POST'])
 def move_to_room():
     """API to move to a different room."""
+    try:
+        games[session['game_id']]
+    except KeyError:
+        create_new_game()
+
     data = request.json
     room_name = data.get("room")
 
     if not room_name:
         return jsonify({"error": "Room name is required"}), 400
 
-    current_room = Entity.player.current_room.get_rooms().get(room_name)
+    current_room = games[session['game_id']].player.current_room.get_rooms().get(room_name)
 
     if not current_room:
         return jsonify({"error": f"No such room: {room_name}"}), 400
@@ -150,6 +201,11 @@ def move_to_room():
 @app.route('/talk', methods=['POST'])
 def talk_to_character():
     """API to talk to AI characters."""
+    try:
+        games[session['game_id']]
+    except KeyError:
+        create_new_game()
+
     data = request.json
     message = data.get("message")
     character_name = data.get("talking_to", None)
@@ -157,7 +213,7 @@ def talk_to_character():
     if not character_name:
         return jsonify({"error": "No conversation is in progress."}), 400
 
-    ai_character = next((char for char in Character.get_all().values() if char.name == character_name), None)
+    ai_character = next((char for char in Character.get_all(world=games[session['game_id']].world).values() if char.name == character_name), None)
 
     if not ai_character:
         return jsonify({"error": "Character not found"}), 404
@@ -168,6 +224,11 @@ def talk_to_character():
 @app.route('/end_talk', methods=['POST'])
 def end_talk():
     """API to end a conversation."""
+    try:
+        games[session['game_id']]
+    except KeyError:
+        create_new_game()
+
     if hasattr(request, "talking_to"):
         del request.talking_to
     return jsonify({"message": "Conversation ended."})
@@ -175,9 +236,13 @@ def end_talk():
 @app.route('/logs', methods=['GET'])
 def get_logs():
     """API to retrieve stdout logs."""
-    global log_buffer
-    logs = log_buffer[:]  # Copy the buffer
-    log_buffer = []  # Clear the buffer after sending logs
+    try:
+        log_buffers[session['game_id']]
+    except KeyError:
+        log_buffers[session['game_id']] = []
+
+    logs = log_buffers[session['game_id']][:]  # Copy the buffer
+    log_buffers[session['game_id']] = []  # Clear the buffer after sending logs
     return jsonify({"logs": logs})
 
 if __name__ == '__main__':

@@ -1,14 +1,16 @@
 class News():
-    bulletins = []
-    subscribers = {}
+    def __init__(self):
+        self.bulletins = []
+        self.subscribers = {}
 
-    @staticmethod
-    def publish(bulletin):
-        News.bulletins.append(bulletin)
-        for subscriber in News.subscribers.values():
+    def publish(self, bulletin):
+        self.bulletins.append(bulletin)
+        for subscriber in self.subscribers.values():
             subscriber.notify_news(bulletin)
 
-    @staticmethod
-    def subscribe(character):
-        News.subscribers[character.name] = character
+    def subscribe(self, character):
+        self.subscribers[character.name] = character
 
+    def unsubscribe(self, character):
+        if character.name in self.subscribers:
+            del self.subscribers[character.name]

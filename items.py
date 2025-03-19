@@ -7,43 +7,43 @@ from characters import Character, AICharacter, WalkerCharacter, NonPlayerCharact
 #class Phone(Item):
 
 class Money(Item):
-    def __init__(self, name="money", description="some money", amount=1.00, **kwargs):
-        super().__init__(name, description, droppable=False)
+    def __init__(self, name="money", description="some money", amount=1.00, game=None, player=None, world=None, **kwargs):
+        super().__init__(name, description, droppable=False, world=world, game=game, player=player)
         self.amount = amount
         self.add_action("take", self.take)
     
     def take(self, **kwargs):
-        Entity.player.current_room.pop(self.name)
-        Entity.player.money = Entity.player.money + self.amount
-        Entity.game.current_room_intro()
+        self.player.current_room.pop(self.name)
+        self.player.money = self.player.money + self.amount
+        self.game.current_room_intro()
         return True
 
 class Wearable(Item):
-    def __init__(self, name="hat", description="A silly hat", wear_msg="You put on the hat.", remove_msg="You took off the hat.", **kwargs):
-        super().__init__(name, description, takeable=True, droppable=True)
+    def __init__(self, name="hat", description="A silly hat", wear_msg="You put on the hat.", remove_msg="You took off the hat.", game=None, player=None, world=None, **kwargs):
+        super().__init__(name, description, takeable=True, droppable=True, world=world, game=game, player=player)
         self.wear_msg = wear_msg
         self.remove_msg = remove_msg
         self.add_action("wear", self.wear)
 
     def wear(self):
-        if Entity.player.in_room_items(self):
+        if self.player.in_room_items(self):
            self.take()
 
-        if self in Entity.player.inv_items.values():
-            print(self.wear_msg)
-            Entity.player.wearing[self.name] = self
+        if self in self.player.inv_items.values():
+            self.game.output(self.wear_msg)
+            self.player.wearing[self.name] = self
             self.add_action("remove", self.remove)
             self.droppable = False
             self.remove_action("drop")
             self.remove_action("wear")
         else:
-            print(f"Something wrong: couldn't wear {self.name}")
+            self.game.output(f"Something wrong: couldn't wear {self.name}")
         return True
 
     def remove(self):
-        print(self.remove_msg)
+        self.game.output(self.remove_msg)
         self.remove_action("remove")
-        del Entity.player.wearing[self.name]
+        del self.player.wearing[self.name]
         self.droppable = True
         self.add_action("drop", self.drop)
         self.add_action("wear", self.wear)
@@ -51,8 +51,8 @@ class Wearable(Item):
 
 class Useable(Item):
     def __init__(self, name="useful item", description="A useful item", takeable=True, droppable=True, verb="use",
-                 use_msg=None, func=lambda var=None: True, **kwargs):
-        Item.__init__(self, name, description, takeable=takeable, droppable=droppable)
+                 use_msg=None, func=lambda var=None: True, game=None, player=None, world=None, **kwargs):
+        Item.__init__(self, name, description, takeable=takeable, droppable=droppable, world=world, game=game, player=player)
         self.use_msg = use_msg
         self.func = func
         self.verb = verb
@@ -60,77 +60,77 @@ class Useable(Item):
 
     def use(self):
         if self.use_msg != None:
-            print(self.use_msg)
+            self.game.output(self.use_msg)
         self.func(self)
         return True
 
 class Weapon(Useable):
-    def __init__(self, name="weapon", description="A weapon", damage=1, **kwargs):
-        super().__init__(name=name, description=description, **kwargs)
+    def __init__(self, name="weapon", description="A weapon", damage=1, game=None, player=None, world=None, **kwargs):
+        super().__init__(name=name, description=description, game=game, player=player, world=world, **kwargs)
         self.damage = damage
         self.add_action("use", self.use)
 
     def use(self, target=None):
         if target == None:
-            target = Character.get(input(f"Who do you want to hit? {list(dict(filter(lambda pair : type(pair[1]) in [Character, AICharacter, WalkerCharacter, NonPlayerCharacter], Entity.player.current_room.get_items().items())).keys())}: "))
+            target = Character.get(input(f"Who do you want to hit? {list(dict(filter(lambda pair : type(pair[1]) in [Character, AICharacter, WalkerCharacter, NonPlayerCharacter], self.player.current_room.get_items().items())).keys())}: "))
         elif type(target) == str:
             target = Character.get(target)
 
         if type(target) in [Character, AICharacter, WalkerCharacter, NonPlayerCharacter]:
             target.take_damage(self.damage)
         else:
-            print("You can only use this weapon on a character.")
+            self.game.output("You can only use this weapon on a character.")
         return True
 
 class Eatable(Useable):
     def __init__(self, name="food", description="A tasty item", takeable=True, droppable=True, verb="eat",
-                 use_msg="Yummy!", func=lambda var=None: True, **kwargs):
-        super().__init__(name, description, takeable, droppable, verb, use_msg, func)
+                 use_msg="Yummy!", func=lambda var=None: True, game=None, player=None, world=None, **kwargs):
+        super().__init__(name, description, takeable, droppable, verb, use_msg, func, game=game, player=player, world=world, **kwargs)
 
     def use(self):
         super().use()
         try:
             # Remove the item from the player's inventory
-            Entity.player.inv_items.pop(self.name)
+            self.player.inv_items.pop(self.name)
         except:
             pass
-        return Entity.purge(self.name)
+        return self.world.purge(self.name)
 
 class Phone(Useable):
-    def __init__(self, name="phone", description="An old phone", cost=0.25, costmsg="No service", mobile=False, **kwargs):
-        super().__init__(name=name, description=description, droppable=mobile, takeable=mobile)
+    def __init__(self, name="phone", description="An old phone", cost=0.25, costmsg="No service", mobile=False, game=None, player=None, world=None, **kwargs):
+        super().__init__(name=name, description=description, droppable=mobile, takeable=mobile, game=game, player=player, world=world, **kwargs)
         self.cost = cost
         self.costmsg = costmsg
         self.add_action("use", self.use)
 
     def use(self, callee: str=None):
-        print(f"This phone costs $ {self.cost} to use.")
+        self.game.output(f"This phone costs $ {self.cost} to use.")
         callees = dict(filter(lambda pair : pair[1].phoneable, AICharacter.get_all().items()))
         if callee == None:
-            print("Who you gonna call? ", end="")
-            print(list(callees.keys()))
+            self.game.output("Who you gonna call? ", end="")
+            self.game.output(list(callees.keys()))
             callee = input("(input): ")
         if callee in callees.keys():
-            if Entity.player.spend(self.cost):
-                print("**RINGING**")
+            if self.player.spend(self.cost):
+                self.game.output("**RINGING**")
                 callees[callee].talk(phone=True)
-                print("\n*Thank you, call again.*\n")
-                Entity.game.current_room_intro()
+                self.game.output("\n*Thank you, call again.*\n")
+                self.game.current_room_intro()
             else:
-                print(self.costmsg)
+                self.game.output(self.costmsg)
         else:
-            print("You can't call them.")
+            self.game.output("You can't call them.")
         return True
 
 class Computer(Useable):
-    def __init__(self, name="computer", description="A computer", mobile=False, **kwargs):
-        super().__init__(name=name, description=description, droppable=mobile, takeable=mobile)
+    def __init__(self, name="computer", description="A computer", mobile=False, game=None, player=None, world=None, **kwargs):
+        super().__init__(name=name, description=description, droppable=mobile, takeable=mobile, game=game, player=player, world=world, **kwargs)
         self.add_action("use", self.use)
 
     def use(self):
-        print()
-        print("You sit down in front of the computer, and with a flick of your hand, the console comes to life...")
-        print("PRESS ENTER TO CONTINUE...", end="")
+        self.game.output()
+        self.game.output("You sit down in front of the computer, and with a flick of your hand, the console comes to life...")
+        self.game.output("PRESS ENTER TO CONTINUE...", end="")
         input()
         
         os.system("clear")
@@ -142,6 +142,6 @@ class Computer(Useable):
         shell = code.InteractiveConsole(variables)
         shell.interact()
 
-        print()
-        Entity.game.current_room_intro()
+        self.game.output()
+        self.game.current_room_intro()
         return True

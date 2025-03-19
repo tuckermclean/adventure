@@ -5,8 +5,8 @@ from entities import Room, Item, Entity, EntityLinkException
 from news import News
 
 class Character(Item):
-    def __init__(self, name="player", description="The main player", health=1, attack_strength=None, damage_msg="Ouch!", attack_msg="Have at you!", current_room=None, lookable=True, **kwargs):
-        Item.__init__(self, name=name, description=description, droppable=False, takeable=False, lookable=lookable)
+    def __init__(self, name="player", description="The main player", health=1, attack_strength=None, damage_msg="Ouch!", attack_msg="Have at you!", current_room=None, lookable=True, news=None, game=None, player=None, world=None, warn=True, **kwargs):
+        Item.__init__(self, name=name, description=description, droppable=False, takeable=False, lookable=lookable, game=game, player=player, world=world, warn=warn)
 
         self.current_room = None
         self.max_items = 5
@@ -21,6 +21,7 @@ class Character(Item):
         self.attack_strength = attack_strength
         self.attack_msg = attack_msg
         self.damage_msg = damage_msg
+        self.news = news
 
         if current_room != None and current_room.__class__ == Room:
             self.go(current_room)
@@ -43,11 +44,11 @@ class Character(Item):
     def spend(self, amount):
         if self.money >= amount:
             self.money = self.money - amount
-            print('$', '{:.2f}'.format(amount), 'spent.')
+            self.game.output('$', '{:.2f}'.format(amount), 'spent.')
 #FIXME            self.do_inv()
             return amount
         else:
-            print("You don't have that kind of money, peasant.")
+            self.game.output("You don't have that kind of money, peasant.")
             return
  #FIXME           return self.do_inv()
 
@@ -61,7 +62,7 @@ class Character(Item):
             self.current_room = room
             self.current_room.add_item(self)
         else:
-            print("WALKER", self.name, "GO", room.name, "DIDN'T WORK")
+            self.game.output("WALKER", self.name, "GO", room.name, "DIDN'T WORK")
 
     def register_watcher(self, watcher):
         self.watchers[watcher.name] = watcher
@@ -75,44 +76,44 @@ class Character(Item):
         elif attacker == None:
             attacker = "player"
         self.health -= damage
-        print(self.damage_msg)
-        print(f"{self.name.title()} took {damage} damage. Health: {self.health} ({self.health / self.first_health * 100:.2f}%)")
-        News.publish(f"{self.name.title()} just got hit by the {attacker.title()} and took {damage} damage. Health: {self.health} ({self.health / self.first_health * 100:.2f}%)")
+        self.game.output(self.damage_msg)
+        self.game.output(f"{self.name.title()} took {damage} damage. Health: {self.health} ({self.health / self.first_health * 100:.2f}%)")
+        self.news.publish(f"{self.name.title()} just got hit by the {attacker.title()} and took {damage} damage. Health: {self.health} ({self.health / self.first_health * 100:.2f}%)")
         if self.health <= 0:
             self.die()
         else:
             self.attack(Entity.player)
 
     def die(self):
-        print(f"{self.name.title()} has died.")
-        News.publish(f"{self.name.title()} has died.")
+        self.game.output(f"{self.name.title()} has died.")
+        self.news.publish(f"{self.name.title()} has died.")
         self.current_room.pop(self.name)
-        Entity.purge(self.name)
+        self.world.purge(self.name)
         try:
-            Entity.player.unregister_watcher(self)
+            self.player.unregister_watcher(self)
         except KeyError:
             pass
         if self.name == "player":
-            print("Game over.")
+            self.game.output("Game over.")
             exit()
     
     def attack(self, target):
         if self.attack_strength != None:
-            print(self.attack_msg)
+            self.game.output(self.attack_msg)
             target.take_damage(damage=self.health / self.first_health * self.attack_strength, attacker=self)
 
 
 class NonPlayerCharacter(Character):
     def __init__(self, name="npc", description="Just hanging around", health=2, attack_strength=None, damage_msg="Ouch!", attack_msg="Have at you!", current_room=None, lookable=True, verb="greet",
-                 use_msg="Hi!", func=lambda var=None: True, **kwargs):
-        Character.__init__(self, name=name, description=description, health=health, attack_strength=attack_strength, damage_msg=damage_msg, attack_msg=attack_msg, current_room=current_room, lookable=lookable)
+                 use_msg="Hi!", func=lambda var=None: True, news=None, game=None, player=None, world=None, **kwargs):
+        Character.__init__(self, name=name, description=description, health=health, attack_strength=attack_strength, damage_msg=damage_msg, attack_msg=attack_msg, current_room=current_room, lookable=lookable, news=news, game=game, player=player, world=world, **kwargs)
         self.use_msg = use_msg
         self.func = func
         self.add_action(verb, self.use)
     
     def use(self):
         if self.use_msg != None:
-            print(self.use_msg)
+            self.game.output(self.use_msg)
         self.func(self)
         return True
 
@@ -121,8 +122,8 @@ class NonPlayerCharacter(Character):
 
 class WalkerCharacter(NonPlayerCharacter):
     def __init__(self, name="walker", description="Just walking around", health=2, attack_strength=None, damage_msg="Ouch!", attack_msg="Have at you!", current_room=None, lookable=True, verb="greet",
-                 use_msg="Hi!", func=lambda var=None: True, **kwargs):
-        NonPlayerCharacter.__init__(self, name=name, description=description, health=health, attack_strength=attack_strength, damage_msg=damage_msg, attack_msg=attack_msg, current_room=current_room, lookable=lookable, verb=verb, use_msg=use_msg, func=func)
+                 use_msg="Hi!", func=lambda var=None: True, news=None, game=None, player=None, world=None, **kwargs):
+        NonPlayerCharacter.__init__(self, name=name, description=description, health=health, attack_strength=attack_strength, damage_msg=damage_msg, attack_msg=attack_msg, current_room=current_room, lookable=lookable, verb=verb, use_msg=use_msg, func=func, news=news, game=game, player=player, world=world, **kwargs)
 
     def loopit(self):
         try:
@@ -131,7 +132,7 @@ class WalkerCharacter(NonPlayerCharacter):
                 room = None
                 while room.__class__ != Room:
                     room = random.choice(list(self.current_room.get_rooms().values()))
-                #print("WALKER", self.name, "GO", room.name)
+                #self.game.output("WALKER", self.name, "GO", room.name)
                 self.go(room)
         except EntityLinkException:
             pass
@@ -235,7 +236,7 @@ class OpenAIClient():
                             yield yielded
 
     @staticmethod
-    def oneoff_prompt(prompt, model="gpt-4-turbo"):
+    def oneoff_prompt(prompt, model="gpt-4-turbo", output=print):
         OpenAIClient.connect()
 
         response = openai.chat.completions.create(
@@ -247,18 +248,18 @@ class OpenAIClient():
 
         try:
             for chunk in response:
-                print(chunk.choices[0].delta.content or "", end="", flush=True)
+                output(chunk.choices[0].delta.content or "", end="", flush=True)
         except Exception as e:
-            print("Error:", e)
-        print()
+            output("Error:", e)
+        output()
 
 class AICharacter(Character):
     def __init__(self, name="ai character", description="Some NPC", health=3, attack_strength=None, current_room=None,
                  prompt="You are a less-than helpful, yet amusing, assistant.",
                  phone_prompt=("The user is calling you on the phone, and you answer in an amusing way. "
                                "Don't worry about sounds or actions, just generate the words."),
-                 func=lambda json: print(f"Character returned: {json}"), **kwargs):
-        super().__init__(name=name, description=description, health=health, attack_strength=attack_strength, current_room=current_room)
+                 func=lambda json: print(f"Character returned: {json}"), news=None, game=None, player=None, world=None, **kwargs):
+        super().__init__(name=name, description=description, health=health, attack_strength=attack_strength, current_room=current_room, news=news, game=game, player=player, world=world, **kwargs)
         self.phoneable = phone_prompt is not None
         self.func = func
         self.add_action("talk", self.talk)
@@ -298,7 +299,7 @@ class AICharacter(Character):
         OpenAIClient.connect()
 
         if phone and not self.phoneable:
-            print("You can't call that character.")
+            self.game.output("You can't call that character.")
             return
 
         thread_id = self.phone_thread_id if phone and self.phoneable else self.thread_id
@@ -314,21 +315,25 @@ class AICharacter(Character):
         full_message = ""
         bye = False
 
-        print("\nCharacter response:\n")
+        self.game.output("\nCharacter response:\n")
 
-        for chunk in OpenAIClient.stream_assistant_response(thread_id, assistant_name, additional_instructions=self.additional_instructions):
-            if isinstance(chunk, str):
-                print(chunk, end="", flush=True)
-                full_message += chunk
-            elif isinstance(chunk, dict):
-                self.func(chunk)
-                bye = True
-            elif isinstance(chunk, list):
-                for obj in chunk:
-                    self.func(obj)
-                bye = True
+        try:
+            for chunk in OpenAIClient.stream_assistant_response(thread_id, assistant_name, additional_instructions=self.additional_instructions):
+                if isinstance(chunk, str):
+                    self.game.output(chunk, end="", flush=True)
+                    full_message += chunk
+                elif isinstance(chunk, dict):
+                    self.func(chunk)
+                    bye = True
+                elif isinstance(chunk, list):
+                    for obj in chunk:
+                        self.func(obj)
+                    bye = True
+        except Exception as e:
+            self.game.output("Error:", e)
+            bye = True
 
-        print("\n")
+        self.game.output("\n")
 
         if re.search(hangups, full_message.lower(), re.IGNORECASE) or re.search(hangups, user_message.lower(), re.IGNORECASE):
             bye = True
@@ -339,7 +344,7 @@ class AICharacter(Character):
                 return self.talk(phone=phone)
 
         if bye:
-            Entity.game.current_room_intro()
+            self.game.current_room_intro()
             return True
 
     def add_to_prompt(self, new_instructions: str):
@@ -348,7 +353,7 @@ class AICharacter(Character):
         effectively updating the context for subsequent calls.
         """
         if not hasattr(self, 'thread_id') or self.thread_id is None:
-            print("No active thread to update.")
+            self.game.output("No active thread to update.")
             return
 
         self.additional_instructions += f"\n{new_instructions}"

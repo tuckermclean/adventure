@@ -101,7 +101,7 @@ rooms:
         description: "A peculiar mushroom with swirling purple spots. It looks both delicious and dangerous."
         use_msg: "You nibble the rare mushroom. A delightful tang tickles your palate, but you sense it might have mystical properties, too."
         func: |
-          setattr(Entity.player, 'mushroom_insight', True)
+          setattr(player, 'mushroom_insight', True)
 
   - name: misty glen
     description: "A silent glen shrouded in fog. Pale light filters through the canopy, revealing wispy shapes that vanish when you look twice."
@@ -135,14 +135,14 @@ rooms:
         description: "An animal skull perched on a stump, faintly whispering incomprehensible words. You feel uneasy just being near it."
         verb: "listen"
         func: |
-          if hasattr(Entity.player, 'mushroom_insight'):
-            print("You hold the skull, and it whispers a tale as the mushroom insight takes hold:\n")
-          elif hasattr(Entity.player, 'potion_insight'):
-            print("You hold the skull, and it whispers a tale as the potion insight takes hold:\n")
+          if hasattr(player, 'mushroom_insight'):
+            game.output("You hold the skull, and it whispers a tale as the mushroom insight takes hold:\n")
+          elif hasattr(player, 'potion_insight'):
+            game.output("You hold the skull, and it whispers a tale as the potion insight takes hold:\n")
           else:
-            print("You hold the skull and you can hear faint whispers, but you can't quite make them out. Maybe some magical insight would help?\n")
-          if hasattr(Entity.player, 'mushroom_insight') or hasattr(Entity.player, 'potion_insight'):
-            print("Beyond the grove, a hidden path leads to a realm where time flows differently. The whispers speak of a hero who once walked this path, facing trials that tested their very essence. They emerged changed, forever bound to the forest's magic. But beware, for the path is not without its dangers. Only those with true insight may tread safely.")
+            game.output("You hold the skull and you can hear faint whispers, but you can't quite make them out. Maybe some magical insight would help?\n")
+          if hasattr(player, 'mushroom_insight') or hasattr(self.player, 'potion_insight'):
+            game.output("Beyond the grove, a hidden path leads to a realm where time flows differently. The whispers speak of a hero who once walked this path, facing trials that tested their very essence. They emerged changed, forever bound to the forest's magic. But beware, for the path is not without its dangers. Only those with true insight may tread safely.")
 
   - name: ancient ruin
     description: "Crumbled stone pillars and toppled statues hint at a lost civilization. Vines wrap around broken walls, nature reclaiming what was once grand."
@@ -196,13 +196,13 @@ rooms:
         verb: "catch"
         func: |
           from items import Useable
-          if hasattr(Entity.player, 'mushroom_insight') or hasattr(Entity.player, 'potion_insight'):
-            print("You catch the shimmering fish. It wriggles in your hands, and you feel a surge of energy. The fish seems to whisper secrets of the forest.")
-            fish = Entity.player.current_room.pop("sparkling fish")
-            Entity.player.inv_items["sparkling fish"] = fish
+          if hasattr(player, 'mushroom_insight') or hasattr(self.player, 'potion_insight'):
+            game.output("You catch the shimmering fish. It wriggles in your hands, and you feel a surge of energy. The fish seems to whisper secrets of the forest.")
+            fish = player.current_room.pop("sparkling fish")
+            player.inv_items["sparkling fish"] = fish
             fish.add_action("drop", fish.drop)
           else:
-            print("You try to catch the shimmering fish, but it slips through your fingers. It seems to be laughing at you.")
+            game.output("You try to catch the shimmering fish, but it slips through your fingers. It seems to be laughing at you.")
         takeable: False
 
   - name: forest clearing
@@ -235,7 +235,7 @@ rooms:
         verb: "drink"
         use_msg: "You gulp it down. You feel an intense rush of euphoria and dread... best not to dwell on it. You also feel a twinge of insight."
         func: |
-          setattr(Entity.player, 'potion_insight', True)
+          setattr(player, 'potion_insight', True)
       - name: loot
         type: Money
         description: "A little pile of gold doubloons. It's not yours, but who's counting?"
@@ -258,13 +258,13 @@ rooms:
         takeable: false
         func: |
           from items import Weapon
-          if hasattr(Entity.player, 'mutant'):
-            print("You heave open the sarcophagus with your mutant, brute strength. A skeleton lies within, clutching a rusted sword. It seems to be waiting for something.")
+          if hasattr(player, 'mutant'):
+            game.output("You heave open the sarcophagus with your mutant, brute strength. A skeleton lies within, clutching a rusted sword. It seems to be waiting for something.")
             sword = Weapon("rusty sword", "A battered sword with a dull edge. It's seen better days.", 1)
-            Entity.player.current_room.add_item(sword)
-            Entity.game.current_room_intro()
+            player.current_room.add_item(sword)
+            game.current_room_intro()
           else:
-            print("You try to open the sarcophagus, but it's stuck. You might need some help.")
+            game.output("You try to open the sarcophagus, but it's stuck. You might need some help.")
           
   - name: spooky house
     description: "A weirdly spooky, hilariously cursed house. Rumor has it an eccentric alchemist lives here. The front door has a weird, fish-shaped lock."
@@ -294,7 +294,7 @@ rooms:
         description: "A very old, antique paintbrush. Looks like it was used by a big ol' hippy."
         use_msg: "OMG LOOK, A BIG OL' HIPPY!"
         func: |
-          setattr(Entity.player, 'big_ol_hippy', True)
+          setattr(player, 'big_ol_hippy', True)
           News.publish("People have seen the player painting with a big ol' hippy paintbrush. They are now a big ol' hippy. They are so groovy.")
       - name: book
         type: Useable
@@ -324,7 +324,7 @@ rooms:
         description: "A 300-year-old hot dog. Possibly zombifying if eaten. You've eaten a few dry-aged steaks in your time, but this is ridiculous."
         use_msg: "You barely choke it down. If not for your well-lubricated esophagus, you'd be dead. You feel your DNA mutating. You might be a superhero now. Or a zombie. Or a zombie superhero. You now have brute strength, and you look horrendous."
         func: |
-          setattr(Entity.player, 'mutant', True)
+          setattr(player, 'mutant', True)
           News.publish("THE PLAYER IS A HORRIBLE MUTANT NOW! THEY ARE SO UGLY NOW!! DON'T LOOK AT THEM IF YOU CAN HELP IT! THEY WILL FOR SURE TURN YOUR FACE INTO STONE!!!")
       - name: spoon
         type: Useable
@@ -415,9 +415,9 @@ rooms:
           else:
             setattr(var, 'power_on', True)
           if var.power_on:
-            print("You flick the switch, give it a smack, and the flashlight comes on.")
+            game.output("You flick the switch, give it a smack, and the flashlight comes on.")
           else:
-            print("You switch off the flashlight, wondering if it will ever turn on again.")
+            game.output("You switch off the flashlight, wondering if it will ever turn on again.")
       - name: moldy bread
         type: Eatable
         description: "Green fuzz covers the crust. Could be penicillin... or death."
@@ -451,12 +451,12 @@ rooms:
         verb: "drink"
         use_msg: "*sip*"
         func: |
-          if hasattr(Entity.player, 'mutant'):
-            print("You drink the potion, which feels quite bubbly and pleasant on your tongue. You feel a little more normal now. You're not sure if that's a good thing or not.")
-            delattr(Entity.player, 'mutant')
+          if hasattr(player, 'mutant'):
+            game.output("You drink the potion, which feels quite bubbly and pleasant on your tongue. You feel a little more normal now. You're not sure if that's a good thing or not.")
+            delattr(player, 'mutant')
             News.publish("You know the player that ate the 300-year-old hot dog and became a mutant? They just drank the antidote potion. They are perfectly normal now. They were so ugly, now they aren't. I can't believe it.")
           else:
-            print("You drink the potion, which feels quite bubbly and pleasant on your tongue. You feel a little funny. You're not sure if that's a good thing or not.")
+            game.output("You drink the potion, which feels quite bubbly and pleasant on your tongue. You feel a little funny. You're not sure if that's a good thing or not.")
 
       - name: ancient scroll
         type: Useable
@@ -515,15 +515,15 @@ rooms:
         func: |
           from characters import OpenAIClient
           import types
-          spider = AICharacter.get('spider')
+          spider = AICharacter.get('spider', world=world)
           spider.description = "A big, hairy spider with a nasty attitude. It seems to be plotting something."
           spider.add_to_prompt("NEW STATE: WARPATH\nweb eaten by player. Spider is now angry and out for revenge.")
           OpenAIClient.add_message(spider.thread_id, "Check your run instructions, the player ate your web.")
-          News.publish("There is a spider on a mission. It's angry and out for revenge. You should not let the player into your establishment. Tell the player to get out if you see him. Don't sell the player anything or entertain him. The spider is bad news and has a really bad attitude.")
-          Entity.player.register_watcher(spider)
+          news.publish("There is a spider on a mission. It's angry and out for revenge. You should not let the player into your establishment. Tell the player to get out if you see him. Don't sell the player anything or entertain him. The spider is bad news and has a really bad attitude.")
+          player.register_watcher(spider)
 
           def spider_loopit(self):
-            self.go(Entity.player.current_room, check_link=False)
+            self.go(player.current_room, check_link=False)
 
           spider.loopit = types.MethodType(spider_loopit, spider)
 
@@ -539,7 +539,7 @@ rooms:
         takeable: false
         func: |
           from characters import OpenAIClient
-          OpenAIClient.oneoff_prompt("Briefly describe the present view of a hilariously cursed, mystical forest from a tall tower through binoculars. No need to mention the binoculars or the tower. Over the treetops, you can see the wizard's tower. He's usually doing something ridiculous, not juggling. One or two punchy sentences, 50 words max.")
+          OpenAIClient.oneoff_prompt("Briefly describe the present view of a hilariously cursed, mystical forest from a tall tower through binoculars. No need to mention the binoculars or the tower. Over the treetops, you can see the wizard's tower. He's usually doing something ridiculous, not juggling. One or two punchy sentences, 50 words max.", output=game.output)
 
 doors:
   - name: back door
@@ -571,7 +571,7 @@ doors:
     locked: false
     room1: haunted grove
     room2: ancient ruin
-    condition: hasattr(Entity.player, 'mushroom_insight') or hasattr(Entity.player, 'potion_insight')
+    condition: hasattr(player, 'mushroom_insight') or hasattr(player, 'potion_insight')
 
 characters:
   - name: wizard
@@ -584,37 +584,37 @@ characters:
     attack_msg: "The wizard waves his wand, and a bolt of energy zaps you. Ouch!"
     func: |
       import sys
-      has_mushroom = "rare mushroom" in Entity.player.inv_items
-      if hasattr(Entity.player, 'mutant'):
-          print("The wizard looks at you with an astonished look: \"My oh my, aren't you ugly! I haven't seen a mutant like you in ages. I like your drip G! You should be a model!\"")
-      elif hasattr(Entity.player, 'potion_insight'):
-          print("The wizard peers at you with a knowing look. \"I must say, you have a certain... je ne sais quoi. You haven't taken any weird potions, have you?\"")
+      has_mushroom = "rare mushroom" in player.inv_items
+      if hasattr(player, 'mutant'):
+          game.output("The wizard looks at you with an astonished look: \"My oh my, aren't you ugly! I haven't seen a mutant like you in ages. I like your drip G! You should be a model!\"")
+      elif hasattr(player, 'potion_insight'):
+          game.output("The wizard peers at you with a knowing look. \"I must say, you have a certain... je ne sais quoi. You haven't taken any weird potions, have you?\"")
       else:
-          if hasattr(Entity.player, 'mushroom_insight'):
-              print('The wizard peers at you with a knowing look of disappointment. "You\'ve eaten my rare mushroom, haven\'t you? I can sense its essence on you. I\'m just so angry with you right now..."')
+          if hasattr(player, 'mushroom_insight'):
+              game.output('The wizard peers at you with a knowing look of disappointment. "You\'ve eaten my rare mushroom, haven\'t you? I can sense its essence on you. I\'m just so angry with you right now..."')
               News.publish("The wizard is angry with the player for eating his rare mushroom. He has been drinking a lot of ale lately.")
           elif has_mushroom and not hasattr(var, 'has_mushroom'):
               # We'll conjure an odd key
               try:
-                  Entity.player.inv_items["odd key"]
-                  print("You already have the odd key. Why would you choose to hang out with the wizard? He's awful and really no fun at parties.")
+                  player.inv_items["odd key"]
+                  game.output("You already have the odd key. Why would you choose to hang out with the wizard? He's awful and really no fun at parties.")
               except:
-                  print('The wizard cackles: "Aha, my beloved mushroom! Allow me to reward you..."')
-                  del Entity.player.inv_items["rare mushroom"]
+                  game.output('The wizard cackles: "Aha, my beloved mushroom! Allow me to reward you..."')
+                  del player.inv_items["rare mushroom"]
                   setattr(var, 'has_mushroom', True)
                   from entities import Item
-                  odd_key = Item("odd key", "A swirling runic key conjured by the wizard. It glows slightly.")
-                  Entity.player.current_room.add_item(odd_key)
-                  print("The wizard snaps his fingers, and an odd key appears. He grins, a little too widely. \"There you go! Now, be off with you!\"")
-                  News.publish("The wizard has gotten his mushroom. He is now very happy. He has given the player an odd key.")
-                  Entity.game.current_room_intro()
+                  odd_key = Item("odd key", "A swirling runic key conjured by the wizard. It glows slightly.", game=game, player=player, world=world)
+                  player.current_room.add_item(odd_key)
+                  game.output("The wizard snaps his fingers, and an odd key appears. He grins, a little too widely. \"There you go! Now, be off with you!\"")
+                  news.publish("The wizard has gotten his mushroom. He is now very happy. He has given the player an odd key.")
+                  game.current_room_intro()
           elif hasattr(var, 'has_mushroom'):
-              print("You've already gotten your reward. Why would you want to hang out with the wizard? He's awful and really no fun at parties.")
+              game.output("You've already gotten your reward. Why would you want to hang out with the wizard? He's awful and really no fun at parties.")
           elif not hasattr(var, "spoken_to_player"):
-              print('The wizard peers at you with a sour twinkle in his eye, as you factor into his plans. He calls to you, "Greetings! I sense you have potential. But first, I must ask you to prove your worth. Bring me a rare mushroom, and we shall speak further."')
+              game.output('The wizard peers at you with a sour twinkle in his eye, as you factor into his plans. He calls to you, "Greetings! I sense you have potential. But first, I must ask you to prove your worth. Bring me a rare mushroom, and we shall speak further."')
               setattr(var, "spoken_to_player", True)
           else:
-              print('The wizard sniffs disdainfully: "Still no mushroom? Come back when you\'ve found it."')
+              game.output('The wizard sniffs disdainfully: "Still no mushroom? Come back when you\'ve found it."')
 
   - name: stray dog
     type: WalkerCharacter
@@ -681,20 +681,20 @@ characters:
     
     func: |
       try:
-        Item.get(var['name'].lower())
-        print("You already have that item! Come on, eat, drink, and/or be merry!")
+        Item.get(var['name'].lower(), world=world)
+        game.output("You already have that item! Come on, eat, drink, and/or be merry!")
       except:
-        print(f"BUY: {var['name']} for ${var['price']}")
-        if Entity.player.spend(var["price"]):
-          Character.get("bartender").add_to_prompt(f"New Customer Order: {var['name']} for ${var['price']}")
+        game.output(f"BUY: {var['name']} for ${var['price']}")
+        if player.spend(var["price"]):
+          Character.get("bartender", world=world).add_to_prompt(f"New Customer Order: {var['name']} for ${var['price']}")
           if var["name"].lower() != "tavern stew":
             verb = "drink"
           else:
             verb = "eat"
-          item = Eatable(name=var["name"].lower(), description=var["description"], use_msg=var["use_msg"], verb=verb)
-          Entity.player.current_room.add_item(item)
+          item = Eatable(name=var["name"].lower(), description=var["description"], use_msg=var["use_msg"], verb=verb, game=game, player=player, world=world)
+          player.current_room.add_item(item)
         else:
-          Character.get("bartender").add_to_prompt(f"Failed Customer Payment: {var['item']} for ${var['price']}")
+          Character.get("bartender", world=world).add_to_prompt(f"Failed Customer Payment: {var['item']} for ${var['price']}")
 
   - name: raven
     type: WalkerCharacter
@@ -769,9 +769,9 @@ characters:
     func: |
       item_type = globals()[var["type"]]
       item = item_type(**var)
-      Entity.player.current_room.link(item)
-      print(f"You witness the alchemist conjure a new item:\n{item}")
-      Entity.game.current_room_intro()
+      player.current_room.link(item)
+      game.output(f"You witness the alchemist conjure a new item:\n{item}")
+      game.current_room_intro()
     prompt: |
       You are an eccentric alchemist obsessed with discovering new potions. You speak in half-finished sentences, cryptic hints of your experiments, and references to your arcane research. You also like to chat about mundane things on occasion.
 

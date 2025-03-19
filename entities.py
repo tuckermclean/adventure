@@ -7,25 +7,32 @@ class NoEntityLinkException(Exception):
     "Thrown when there is no near-enough link to an Entity with this name"
 
 class Entity:
-    world = None
-    game = None
-    player = None
-
-    def __init__(self, name = 'No name', description = 'No description'):
+    def __init__(self, name = 'No name', description = 'No description', game=None, player=None, world=None, warn=True):
         self.name = name
         self.description = description
         self.linked = {}
         self.actions = {}
+        self.game = game
+        self.player = player
+        self.world = world
 
-        if Entity.world != None:
-            Entity.world.link(self)
+        if self.world != None:
+            self.world.link(self)
+
+        if warn:
+            if self.player == None:
+                self.game.output(f"Warning: {type(self).__name__} has no player set")
+            if self.game == None:
+                self.game.output(f"Warning: {type(self).__name__} has no game set")
+            if self.world == None:
+                self.game.output(f"Warning: {type(self).__name__} has no world set")
 
     def __str__(self):
         return f"{self.name.upper()} -- {self.description}"
 
     def __repr__(self):
         return self.__str__()
-
+    
     def link(self, linked: Entity, override = False):
         if linked.name not in self.linked.keys() or override == True:
             self.linked.update({ f"{linked.name}": linked })
@@ -55,7 +62,7 @@ class Entity:
         except KeyError:
             return None
         except Exception as e:
-            print("Something went wrong during action:", action, e)
+            self.game.output("Something went wrong during action:", action, e)
 
     def traverse(self, max_levels=-1, first_level=0, entities=None):
         if entities == None:
@@ -80,51 +87,49 @@ class Entity:
         else:
             return False
 
-    @classmethod
-    def set_game(cls, game):
-        cls.game = game
+    def set_game(self, game):
+        self.game = game
+
+    def set_player(self, player):
+        self.player = player
+
+    def set_world(self, world):
+        self.world = world
 
     @classmethod
-    def set_player(cls, player):
-        cls.player = player
+    def get_all(cls, world):
+        return dict(filter(lambda pair : isinstance(pair[1], cls) or issubclass(pair[1].__class__, cls), world.linked.items()))
 
     @classmethod
-    def set_world(cls, world):
-        cls.world = world
-
-    @classmethod
-    def get_all(cls):
-        return dict(filter(lambda pair : isinstance(pair[1], cls) or issubclass(pair[1].__class__, cls), Entity.world.linked.items()))
-
-    @classmethod
-    def get(cls, name):
+    def get(cls, name, world):
         try:
-            return cls.get_all()[name]
+            return cls.get_all(world)[name]
         except KeyError:
             raise NoEntityLinkException
 
-    @staticmethod
-    def purge(name):
+    def purge(self, name):
         popped = 0
-        for entity in Entity.world.traverse():
+        for entity in self.world.traverse():
             try:
-                Entity.get(entity).pop(name)
+                self.get(entity).pop(name)
                 popped = popped + 1
             except NoEntityLinkException:
                 pass
         try:
-            Entity.world.pop(name)
+            self.world.pop(name)
             popped = popped + 1
         except NoEntityLinkException:
             pass
 
         return popped > 0
 
-Entity.world = Entity("world", "The world as we know it")
+class World(Entity):
+    def __init__(self, name = 'world', description = 'The world as we know it', game=None, player=None, warn=True):
+        super().__init__(name, description, game, player, world=self, warn=warn)
 
 class Item(Entity):
-    def __init__(self, name = 'item', description = "No description", droppable=True, takeable=True, lookable=True, **kwargs):
-        Entity.__init__(self, name, description)
+    def __init__(self, name = 'item', description = "No description", droppable=True, takeable=True, lookable=True, game=None, player=None, world=None, warn=True, **kwargs):
+        super().__init__(name, description, game, player, world, warn=warn)
         self.droppable = droppable
         self.takeable = takeable
         if takeable:
@@ -136,62 +141,62 @@ class Item(Entity):
         super().link(item)
 
     def look(self):
-        print(self.name.upper(), " -- " , self.description)
-        print(f"Actions: {list(self.actions.keys())}")
+        self.game.output(self.name.upper(), " -- " , self.description)
+        self.game.output(f"Actions: {list(self.actions.keys())}")
         return True
 
     def take(self, look=True):
         """Take an item"""
-        if Entity.player.in_room_items(self):
-            if len(Entity.player.inv_items) >= Entity.player.max_items:
-                print(f"You already have {Entity.player.max_items} items, buddy")
+        if self.player.in_room_items(self):
+            if len(self.player.inv_items) >= self.player.max_items:
+                self.game.output(f"You already have {self.player.max_items} items, buddy")
             else:
-                Entity.player.inv_items[self.name] = Entity.player.current_room.pop(self.name)
+                self.player.inv_items[self.name] = self.player.current_room.pop(self.name)
                 self.remove_action("take")
                 if self.droppable:
                     self.add_action("drop", self.drop)
                 if look:
                     self.look()
         else:
-            print("That item is not in this room!")
+            self.game.output("That item is not in this room!")
         return True
     
     def drop(self):
         """Drop an item from inventory"""
-        if self in Entity.player.inv_items.values():
+        if self in self.player.inv_items.values():
             if self.droppable:
-                del Entity.player.inv_items[self.name]
-                Entity.player.current_room.add_item(self)
+                del self.player.inv_items[self.name]
+                self.player.current_room.add_item(self)
                 self.remove_action("drop")
                 if self.takeable:
                     self.add_action("take", self.take)
-                Entity.game.current_room_intro()
+                self.game.current_room_intro()
             else:
-                print("That item is not droppable, guess you're stuck with it.")
+                self.game.output("That item is not droppable, guess you're stuck with it.")
         else:
-            print("You don't have that item, dingus")
+            self.game.output("You don't have that item, dingus")
         return True
 
 class Room(Entity):
-    def __init__(self, name='room', description = "An empty room", **kwargs):
-        super().__init__(name, description)
+    def __init__(self, name='room', description = "An empty room", game=None, player=None, world=None, **kwargs):
+        super().__init__(name, description, game, player, world)
         self.add_action("go", self.go)
         if 'links' in kwargs:
             for link in kwargs['links']:
                 try:
-                    self.link_room(Room.get(link))
+                    self.link_room(self.get(link, self.world))
                 except NoEntityLinkException:
                     pass
 
     def go(self):
-        Entity.player.current_room.pop(Entity.player.name)
-        Entity.player.current_room = self
-        Entity.player.current_room.add_item(Entity.player)
+        self.player.current_room.pop(self.player.name)
+        self.player.current_room = self
+        self.player.current_room.add_item(self.player)
 
-        for watcher in Entity.player.watchers.values():
+        for watcher in self.player.watchers.values():
             watcher.loopit()
 
-        Entity.game.current_room_intro()
+        self.game.current_room_intro()
         return True
 
     def link_room(self, room: Room):
@@ -222,7 +227,7 @@ class Room(Entity):
 
     def get_actions(self):
         actions = {}
-        for item in list(self.linked.values()) + list(Entity.player.inv_items.values()):
+        for item in list(self.linked.values()) + list(self.player.inv_items.values()):
             for action in item.actions:
                 try:
                     if not isinstance(actions[action], list):
@@ -234,8 +239,8 @@ class Room(Entity):
         return actions
 
 class Door(Room):
-    def __init__(self, name: str, room1: Room, room2: Room, locked = True, key: Item = None, **kwargs):
-        super().__init__(name, f"Door between {room1.name} and {room2.name}")
+    def __init__(self, name: str, room1: Room, room2: Room, locked = True, key: Item = None, game=None, player=None, world=None, **kwargs):
+        super().__init__(name, description=f"Door between {room1.name} and {room2.name}", game=game, player=player, world=world)
         super().link_room(room1)
         super().link_room(room2)
         self.locked = locked
@@ -265,58 +270,58 @@ class Door(Room):
     
     def go(self):
         if self.locked == False:
-            Entity.player.current_room.pop(Entity.player.name)
-            Entity.player.current_room = self.get_other(Entity.player.current_room)
-            Entity.player.current_room.add_item(Entity.player)
+            self.player.current_room.pop(self.player.name)
+            self.player.current_room = self.get_other(self.player.current_room)
+            self.player.current_room.add_item(self.player)
 
-            for watcher in Entity.player.watchers.values():
+            for watcher in self.player.watchers.values():
                 watcher.loopit()
 
-            Entity.game.current_room_intro()
+            self.game.current_room_intro()
         else:
-            print("That door is locked.")
+            self.game.output("That door is locked.")
         return True
 
     def unlock(self):
         """Unlock a door"""
-        if Entity.player.in_rooms(self):
+        if self.player.in_rooms(self):
             if self.locked == False:
-                print("This door is already unlocked")
-            elif self.key in Entity.player.inv_items.values() or self.key in Entity.player.inv_items.keys():
+                self.game.output("This door is already unlocked")
+            elif self.key in self.player.inv_items.values() or self.key in self.player.inv_items.keys():
                 self.locked = False
-                print("Door unlocked")
+                self.game.output("Door unlocked")
                 self.remove_action("unlock")
                 self.add_action("lock", self.lock)
             else:
-                print("You don't have the key to unlock this door")
+                self.game.output("You don't have the key to unlock this door")
         else:
-            print("That door isn't here")
+            self.game.output("That door isn't here")
         return True
     
     def lock(self):
-        if Entity.player.in_rooms(self):
+        if self.player.in_rooms(self):
             if self.locked == True:
-                print("This door is already locked")
-            elif self.key in Entity.player.inv_items.values():
+                self.game.output("This door is already locked")
+            elif self.key in self.player.inv_items.values():
                 self.locked = True
-                print("Door locked")
+                self.game.output("Door locked")
                 self.remove_action("lock")
                 self.add_action("unlock", self.unlock)
             else:
-                print("You don't have the key to lock this door")
+                self.game.output("You don't have the key to lock this door")
         else:
-            print("That door isn't here")
+            self.game.output("That door isn't here")
         return True
 
 class HiddenDoor(Door):
     """A door that is hidden and will only show when a certain condition is met"""
-    def __init__(self, name: str, room1: Room, room2: Room, condition: lambda var=None: bool, **kwargs):
-        super().__init__(name, room1, room2, **kwargs)
+    def __init__(self, name: str, room1: Room, room2: Room, condition: lambda var=None: bool, game=None, player=None, world=None, **kwargs):
+        super().__init__(name, room1, room2, game=game, player=player, world=world, **kwargs)
         self.condition = condition
 
     def go(self):
         if self.condition():
             super().go()
         else:
-            print("The door is hidden and cannot be accessed yet.")
+            self.game.output("The door is hidden and cannot be accessed yet.")
         return True

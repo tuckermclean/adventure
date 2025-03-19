@@ -1,27 +1,50 @@
 from __future__ import annotations
 import cmd2, os, shlex, sys, yaml
-from entities import Room, Door, HiddenDoor, Item, Entity
+from entities import Room, Door, HiddenDoor, Item, Entity, World
 from items import Money, Wearable, Useable, Eatable, Computer, Phone, Weapon
 from characters import Character, AICharacter, WalkerCharacter, NonPlayerCharacter
 from news import News
 
 class Adventure(cmd2.Cmd):
-    def __init__(self, player=None, file="world.yaml"):
+    def __init__(self, player=None, world=None, file="world.yaml", output=print):
         self.prompt = "> "
         if len(sys.argv) > 1:
             self.file = sys.argv[1]
-        else:
+        elif file is not None and world is None:
             self.file = file
-        Entity.set_game(self)
-        Entity.set_player(player)
-        
+        if world is None:
+            self.world = World(game=self, warn=False)
+        else:
+            self.world = world
+        if player is None:
+            player = Character(lookable=False, health=3, world=world, game=self, warn=False)
+            player.set_game(self)
+        else:
+            player.set_game(self)
+        self.world.set_player(player)
+        self.player = player
+        self.player.set_world(self.world)
+        self.player.set_game(self)
+        self.news = News()
+        self.output = output
+
+        if self.file is not None:
+            self.world = Adventure.load_world(self.file, game=self, player=self.player, news=self.news)
+
+        # Go to first room
+        self.player.go(list(Room.get_all(world=self.world).values())[0])
+        super().__init__()
+
+    @staticmethod
+    def load_world(filename="world.yaml", game=None, player=None, news=None, output=print):
+        world_obj = World(game=game, player=player)
         # Load the world from a file
-        if os.path.exists(self.file):
-            with open(self.file, 'r', encoding="utf-8") as stream:
+        if os.path.exists(filename):
+            with open(filename, 'r', encoding="utf-8") as stream:
                 try:
                     world = yaml.safe_load(stream)
                     for room in world['rooms']:
-                        Room(**room)
+                        Room(**room, game=game, player=player, world=world_obj)
                         for item in room['items']:
                             # Return the item class based on the item type
                             item_class = globals()[item['type']]
@@ -29,47 +52,45 @@ class Adventure(cmd2.Cmd):
                                 def closure(func):
                                     return lambda var=None: exec(func)
                                 item['func'] = closure(item['func']) or True
-                            item_class(**item)
-                            Room.get(room['name']).add_item(item_class.get(item['name']))
+                            item_class(**item, game=game, player=player, world=world_obj)
+                            Room.get(room['name'], world=world_obj).add_item(item_class.get(item['name'], world=world_obj))
                     for door in world['doors']:
-                        door['room1'] = Room.get(door['room1'])
-                        door['room2'] = Room.get(door['room2'])
+                        door['room1'] = Room.get(door['room1'], world=world_obj)
+                        door['room2'] = Room.get(door['room2'], world=world_obj)
                         try:
-                            door['key'] = Item.get(door['key'])
+                            door['key'] = Item.get(door['key'], world=world_obj)
                         except:
                             pass
                         if door.get('hidden', False):
                             if 'condition' in door:
                                 def closure(condition):
-                                    return lambda var=None: eval(condition)
+                                    return lambda var=None, game=game, player=player, world=world_obj, news=news: eval(condition)
                                 door['condition'] = closure(door['condition']) or True
-                            HiddenDoor(**door)
+                            HiddenDoor(**door, game=game, player=player, world=world_obj)
                         else:
-                            Door(**door)
+                            Door(**door, game=game, player=player, world=world_obj)
                     for character in world['characters']:
                         character_class = globals()[character['type']]
                         if 'func' in character:
                             def closure(func):
-                                return lambda var=None: exec(func)
+                                return lambda var=None, game=game, player=player, world=world_obj, news=news: exec(func)
                             character['func'] = closure(character['func']) or True
-                        character_obj = character_class(**character)
-                        character_obj.go(Room.get(character['current_room']))
+                        character_obj = character_class(**character, game=game, player=player, world=world_obj)
+                        character_obj.go(Room.get(character['current_room'], world=world_obj))
                         try:
                             if character_class == AICharacter and character['news'] == True:
-                                News.subscribe(character_obj)
+                                news.subscribe(character_obj)
                         except:
                             pass
                     for help in world['help']:
                         text = world['help'][help]
-                        setattr(self, f"help_{help}", lambda text=text: print(text))
+                        if game:
+                            setattr(game, f"help_{help}", lambda text=text: output(text))
                 except yaml.YAMLError as exc:
-                    print(exc)
-            # Go to first room
-            Entity.player.go(list(Room.get_all().values())[0])
+                    output(exc)
         else:
-            print("No world file found.")
-
-        super().__init__()
+            output("No world file found.")
+        return world_obj
 
     def do_inv(self, arg=None):
         """List items in inventory"""
@@ -81,10 +102,10 @@ class Adventure(cmd2.Cmd):
     def do_reset(self, arg=None):
         """Reset the game"""
         self.postloop()
-        Entity.world = Entity("world")
-        Entity.player = Character(lookable=False)
-        Entity.game = Adventure(Entity.player)
-        Entity.game.cmdloop()
+        player = Character(lookable=False)
+        game = Adventure(player)
+        self.world = World(game=game, player=player)
+        game.cmdloop()
 
     def postloop(self):
         return True
@@ -123,7 +144,7 @@ class Adventure(cmd2.Cmd):
             item_partial = ""
 
         # Get all possible actions from the current room
-        actions_dict = Entity.player.current_room.get_actions()
+        actions_dict = self.player.current_room.get_actions()
         # e.g. { 'take': [<Item1>, <Item2>], 'look': [...], 'go': [...], ... }
 
         # If the action doesn't exist, return empty
@@ -157,7 +178,7 @@ class Adventure(cmd2.Cmd):
         return completions
 
     def get_all_commands(self):
-        return list(Entity.player.current_room.get_actions().keys()) + ['exit', 'help', 'reset']
+        return list(self.player.current_room.get_actions().keys()) + ['exit', 'help', 'reset']
 
     def default(self, line):
         command = shlex.split(line.raw)
@@ -169,44 +190,43 @@ class Adventure(cmd2.Cmd):
             try:
                 item_name = " ".join(command[1:]).lower().strip()
             except Exception as e:
-                print(e)
+                self.output(e)
                 item_name = None
             if not item_name:
                 return
-            item = Entity.get(item_name)
-            if Entity.player.in_room_items(item) or item in Entity.player.inv_items.values():
+            item = Entity.get(item_name, world=self.world)
+            if self.player.in_room_items(item) or item in self.player.inv_items.values():
                 try:
                     if not item.do(action):
-                        print(f"I don't know how to do '{action}' to '{item_name}'")
+                        self.output(f"I don't know how to do '{action}' to '{item_name}'")
                 except Exception as e:
-                    print(f"I couldn't do '{action}' to '{item_name}': {type(e)}")
+                    self.output(f"I couldn't do '{action}' to '{item_name}': {type(e)}")
             else:
-                print(f"I don't see that item here: {item_name}")
+                self.output(f"I don't see that item here: {item_name}")
         except Exception as e:
-            print(f"I couldn't do '{action}' to '{item_name}': {type(e)}")
+            self.output(f"I couldn't do '{action}' to '{item_name}': {type(e)}")
         
     def current_room_intro(self):
-        for char in dict(filter(lambda pair : Entity.player.in_room_items(pair[1]), Character.get_all().items())).values():
+        for char in dict(filter(lambda pair : self.player.in_room_items(pair[1]), Character.get_all(world=self.world).items())).values():
             char.loopit()
-        print('You are in:', Entity.player.current_room.name.upper(), ' -- ', Entity.player.current_room.description)
-        print('In this room, there are:', list(dict(filter(lambda pair : pair[1] != Entity.player, Entity.player.current_room.get_items().items())).keys()))
-        print('The rooms next door:', list(Entity.player.current_room.get_rooms().keys()))
-        print("Items you have:", list(Entity.player.inv_items.keys()), " --  Money: $", '{:.2f}'.format(Entity.player.money))
-        print()
-        for char in dict(filter(lambda pair : Entity.player.in_room_items(pair[1]) and pair[1] != Entity.player, Character.get_all().items())).values():
+        self.output('You are in:', self.player.current_room.name.upper(), ' -- ', self.player.current_room.description)
+        self.output('In this room, there are:', list(dict(filter(lambda pair : pair[1] != self.player, self.player.current_room.get_items().items())).keys()))
+        self.output('The rooms next door:', list(self.player.current_room.get_rooms().keys()))
+        self.output("Items you have:", list(self.player.inv_items.keys()), " --  Money: $", '{:.2f}'.format(self.player.money))
+        self.output()
+        for char in dict(filter(lambda pair : self.player.in_room_items(pair[1]) and pair[1] != self.player, Character.get_all(world=self.world).items())).values():
             try:
                 if char.words != "":
-                    print(f"{char.description}\t{char.words}")
+                    self.output(f"{char.description}\t{char.words}")
                 else:
-                    print(f"{char.description}")
+                    self.output(f"{char.description}")
             except:
-                print(f"{char.description}")
+                self.output(f"{char.description}")
                 
     def preloop(self):
-        print("Welcome to the adventure game!   Type help or ? to list commands.\n")
+        self.output("Welcome to the adventure game!   Type help or ? to list commands.\n")
         self.current_room_intro()
 
 if __name__ == '__main__':
-    player = Character(lookable=False, health=3)
-    game = Adventure(player)
+    game = Adventure()
     game.cmdloop()
