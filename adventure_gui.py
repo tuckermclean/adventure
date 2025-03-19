@@ -17,7 +17,10 @@ class AdventureGUI:
         self.player = Entity.player
 
         self.root.title("Adventure Game")
-        self.root.geometry('800x600')
+        self.root.geometry('600x800')
+
+        # Set default font
+        self.root.option_add("*Font", "Helvetica 12")
 
         self.selected_action = None
         self.selected_item = None
@@ -25,6 +28,8 @@ class AdventureGUI:
         self.create_widgets()
         self.redirect_stdout()
         self.update_gui()
+
+        Entity.game.current_room_intro = self.update_gui
 
     def create_widgets(self):
         self.image_frame = tk.Frame(self.root, height=300, width=600)
@@ -52,6 +57,8 @@ class AdventureGUI:
         self.inventory_frame.pack(pady=5)
 
         self.output_text = tk.Text(self.root, height=10, state="disabled")
+        # Set text wrapping to word
+        self.output_text.config(wrap="word")
         self.output_text.pack(pady=10, fill="x")
 
         self.input_entry = tk.Entry(self.root)
@@ -68,7 +75,7 @@ class AdventureGUI:
                 widget.destroy()
 
         current_room = self.player.current_room
-        self.location_label.config(text=current_room.name)
+        self.location_label.config(text=current_room.name.title())
         self.location_desc.config(text=current_room.description)
 
         self.update_room_image(current_room)
@@ -117,6 +124,9 @@ class AdventureGUI:
             lbl = tk.Button(self.inventory_frame, text=inv_item.name,
                             command=lambda i=inv_item: self.select_item(i.name))
             lbl.pack(side="left", padx=5)
+        
+        # Label for money:
+        tk.Label(self.inventory_frame, text=f"Money: ${'{:.2f}'.format(Entity.player.money)}").pack(side="left", padx=5)
 
     def update_room_image(self, room):
         image_path = f"images/{room.name.lower().replace(' ', '_').replace("'", '_')}.jpeg"
@@ -149,6 +159,11 @@ class AdventureGUI:
             self.start_talk_ai(item)
         elif isinstance(item, Weapon) and action.lower() == "use":
             self.show_weapon_targets(item)
+        elif action.lower() == "look":
+            print(item)
+        elif action.lower() == "take":
+            item.take(look=False)
+            print(item)
         else:
             item.do(action)
         self.selected_action = None

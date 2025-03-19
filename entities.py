@@ -140,7 +140,7 @@ class Item(Entity):
         print(f"Actions: {list(self.actions.keys())}")
         return True
 
-    def take(self):
+    def take(self, look=True):
         """Take an item"""
         if Entity.player.in_room_items(self):
             if len(Entity.player.inv_items) >= Entity.player.max_items:
@@ -150,7 +150,8 @@ class Item(Entity):
                 self.remove_action("take")
                 if self.droppable:
                     self.add_action("drop", self.drop)
-                self.look()
+                if look:
+                    self.look()
         else:
             print("That item is not in this room!")
         return True
