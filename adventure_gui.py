@@ -93,7 +93,11 @@ class AdventureGUI:
             actions = {action for action, objs in actions_dict.items() if any(obj.name == self.selected_item for obj in objs)}
 
         for action in actions:
-            btn = tk.Button(self.action_buttons_frame, text=action.capitalize(),
+            if action == self.selected_action:
+                btn = tk.Button(self.action_buttons_frame, text=action,
+                            command=lambda a=action: self.select_action(a), background="blue")
+            else:
+                btn = tk.Button(self.action_buttons_frame, text=action,
                             command=lambda a=action: self.select_action(a))
             btn.pack(side="left", padx=5)
 
@@ -101,7 +105,11 @@ class AdventureGUI:
         tk.Label(self.item_buttons_frame, text="Items:").pack(side="left", padx=5)
 
         for item_name in items:
-            btn = tk.Button(self.item_buttons_frame, text=item_name,
+            if item_name == self.selected_item:
+                btn = tk.Button(self.item_buttons_frame, text=item_name,
+                            command=lambda i=item_name: self.select_item(i), background="blue")
+            else:
+                btn = tk.Button(self.item_buttons_frame, text=item_name,
                             command=lambda i=item_name: self.select_item(i))
             btn.pack(side="left", padx=5)
 
