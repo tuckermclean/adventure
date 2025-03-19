@@ -1,6 +1,7 @@
 cmd2
 openai
 pyyaml
+PIL
 
 # Development dependencies
 pytest

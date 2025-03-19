@@ -1,7 +1,8 @@
 # gui_adventure.py
 
 import tkinter as tk
-from tkinter import messagebox
+from tkinter import messagebox, PhotoImage
+from PIL import Image, ImageTk
 from characters import Character, AICharacter
 from entities import Entity, Room, Door, HiddenDoor
 from items import Weapon
@@ -26,6 +27,12 @@ class AdventureGUI:
         self.update_gui()
 
     def create_widgets(self):
+        self.image_frame = tk.Frame(self.root, height=300, width=600)
+        self.image_frame.pack()
+
+        self.room_image_label = tk.Label(self.image_frame)
+        self.room_image_label.pack()
+
         self.location_label = tk.Label(self.root, text="", font=("Helvetica", 16, "bold"))
         self.location_label.pack(pady=5)
 
@@ -63,6 +70,8 @@ class AdventureGUI:
         current_room = self.player.current_room
         self.location_label.config(text=current_room.name)
         self.location_desc.config(text=current_room.description)
+
+        self.update_room_image(current_room)
 
         actions_dict = current_room.get_actions()
         actions = set(actions_dict.keys()) - {"go"}
@@ -108,6 +117,15 @@ class AdventureGUI:
             lbl = tk.Button(self.inventory_frame, text=inv_item.name,
                             command=lambda i=inv_item: self.select_item(i.name))
             lbl.pack(side="left", padx=5)
+
+    def update_room_image(self, room):
+        image_path = f"images/{room.name.lower().replace(' ', '_').replace("'", '_')}.jpeg"
+        try:
+            img = Image.open(image_path)
+            self.room_image = ImageTk.PhotoImage(img)
+            self.room_image_label.config(image=self.room_image)
+        except FileNotFoundError:
+            self.room_image_label.config(image="")
 
     def select_action(self, action):
         self.selected_action = None if self.selected_action == action else action
