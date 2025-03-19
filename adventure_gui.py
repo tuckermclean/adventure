@@ -1,9 +1,9 @@
 # gui_adventure.py
 
 import tkinter as tk
-from tkinter import messagebox, simpledialog
+from tkinter import messagebox
 from characters import Character, AICharacter
-from entities import Entity, Room, Door
+from entities import Entity, Room, Door, HiddenDoor
 from items import Weapon
 from adventure import Adventure
 import sys
@@ -66,7 +66,10 @@ class AdventureGUI:
 
         actions_dict = current_room.get_actions()
         actions = set(actions_dict.keys()) - {"go"}
-        items = set(item.name for sublist in actions_dict.values() for item in sublist) - self.player.inv_items.keys() - current_room.get_rooms().keys()
+        items = set(item.name for sublist in actions_dict.values() for item in sublist) - self.player.inv_items.keys() - current_room.get_rooms(show_hidden=True).keys()
+
+        # Label for actions:
+        tk.Label(self.action_buttons_frame, text="Actions:").pack(side="left", padx=5)
 
         if self.selected_action:
             items = set(item.name for item in actions_dict[self.selected_action])
@@ -78,15 +81,28 @@ class AdventureGUI:
                             command=lambda a=action: self.select_action(a))
             btn.pack(side="left", padx=5)
 
+        # Label for items:
+        tk.Label(self.item_buttons_frame, text="Items:").pack(side="left", padx=5)
+
         for item_name in items:
             btn = tk.Button(self.item_buttons_frame, text=item_name,
                             command=lambda i=item_name: self.select_item(i))
             btn.pack(side="left", padx=5)
 
+        # Label for adjacent rooms:
+        tk.Label(self.adjacent_rooms_frame, text="Adjacent Rooms:").pack(side="left", padx=5)
+
         for room_name, room in current_room.get_rooms().items():
+            # If it's a hidden door, and the condition is not met, skip it
+            if isinstance(room, HiddenDoor) and not room.condition():
+                continue
+
             btn = tk.Button(self.adjacent_rooms_frame, text=room_name,
                             command=lambda r=room: self.move_to_room(r))
             btn.pack(side="left", padx=5)
+
+        # Label for inventory:
+        tk.Label(self.inventory_frame, text="Inventory:").pack(side="left", padx=5)
 
         for inv_item in self.player.inv_items.values():
             lbl = tk.Button(self.inventory_frame, text=inv_item.name,
@@ -114,24 +130,40 @@ class AdventureGUI:
         if isinstance(item, AICharacter) and action.lower() == "talk":
             self.start_talk_ai(item)
         elif isinstance(item, Weapon) and action.lower() == "use":
-            def use_item():
-                self.use_item_with_prompt(item)
-                self.update_gui()
-            self.root.after(0, use_item)
+            self.show_weapon_targets(item)
         else:
             item.do(action)
         self.selected_action = None
         self.selected_item = None
         self.update_gui()
 
-    def use_item_with_prompt(self, item):
-        target_name = simpledialog.askstring("Use Item", "Who do you want use this on?")
-        if target_name:
-            target = Entity.get(target_name)
-            if target and self.player.in_room_items(target):
-                item.use(target)
-            else:
-                print(f"There's no '{target_name}' here to use it on.")
+    def show_weapon_targets(self, weapon):
+        target_window = tk.Toplevel(self.root)
+        target_window.title("Choose Target")
+        tk.Label(target_window, text="Choose a target:").pack(pady=5)
+        # Filter list of items in the room to only include characters and exclude the player
+        characters = [
+            entity for entity in self.player.current_room.get_items().values()
+            if isinstance(entity, Character) and entity != self.player
+        ]
+
+        if not characters:
+            messagebox.showinfo("No Targets", "No valid targets available.")
+            target_window.destroy()
+            return
+        
+        for entity in characters:
+            btn = tk.Button(
+                target_window,
+                text=entity.name,
+                command=lambda e=entity: self.use_weapon_on_target(weapon, target=e, window=target_window)
+            )
+            btn.pack(pady=2)
+
+    def use_weapon_on_target(self, weapon, target, window):
+        weapon.use(target)
+        window.destroy()
+        self.update_gui()
 
     def move_to_room(self, room):
         self.end_talk_ai()

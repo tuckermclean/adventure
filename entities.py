@@ -209,9 +209,12 @@ class Room(Entity):
         else:
             return dict(filter(lambda pair : isinstance(pair[1], Item), self.linked.items()))
 
-    def get_rooms(self):
+    def get_rooms(self, show_hidden=False):
         # If the room is a HiddenDoor, don't return it if condition() is False
-        return dict(filter(lambda pair : (isinstance(pair[1], Room) and not isinstance(pair[1], HiddenDoor)) or (isinstance(pair[1], HiddenDoor) and pair[1].condition()), self.linked.items()))
+        if show_hidden:
+            return dict(filter(lambda pair : isinstance(pair[1], Room), self.linked.items()))
+        else:
+            return dict(filter(lambda pair : (isinstance(pair[1], Room) and not isinstance(pair[1], HiddenDoor)) or (isinstance(pair[1], HiddenDoor) and pair[1].condition()), self.linked.items()))
 
     def get_doors(self):
         return dict(filter(lambda pair : (isinstance(pair[1], Door) and not isinstance(pair[1], HiddenDoor)) or (isinstance(pair[1], HiddenDoor) and pair[1].condition()), self.linked.items()))

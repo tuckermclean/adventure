@@ -88,7 +88,10 @@ class Character(Item):
         News.publish(f"{self.name.title()} has died.")
         self.current_room.pop(self.name)
         Entity.purge(self.name)
-        Entity.player.unregister_watcher(self)
+        try:
+            Entity.player.unregister_watcher(self)
+        except KeyError:
+            pass
         if self.name == "player":
             print("Game over.")
             exit()

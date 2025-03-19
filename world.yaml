@@ -12,6 +12,7 @@ rooms:
         description: "An ornate fountain spouting slightly murky water. Town rumor says tossing a coin in grants luck, but nobody looks lucky here."
         verb: "toss"
         use_msg: "You toss some water in the air. Nobody seems impressed."
+        takeable: false
       - name: payphone
         type: Phone
         description: "A battered payphone perched strangely in the middle of the village square. Possibly the only phone around."
@@ -126,32 +127,32 @@ rooms:
     description: "Twisted trees and gnarled roots give this grove a menacing aura. Faint whispers echo, though no one is visible. The air grows colder."
     links:
       - fae circle
-      - ancient ruin
     items:
       - name: whispering skull
-        type: Item
+        type: Useable
         description: "An animal skull perched on a stump, faintly whispering incomprehensible words. You feel uneasy just being near it."
+        verb: "listen"
+        func: |
+          if hasattr(Entity.player, 'mushroom_insight'):
+            print("You hold the skull, and it whispers a tale as the mushroom insight takes hold:\n")
+          elif hasattr(Entity.player, 'potion_insight'):
+            print("You hold the skull, and it whispers a tale as the potion insight takes hold:\n")
+          else:
+            print("You hold the skull and you can hear faint whispers, but you can't quite make them out. Maybe some magical insight would help?\n")
+          if hasattr(Entity.player, 'mushroom_insight') or hasattr(Entity.player, 'potion_insight'):
+            print("Beyond the grove, a hidden path leads to a realm where time flows differently. The whispers speak of a hero who once walked this path, facing trials that tested their very essence. They emerged changed, forever bound to the forest's magic. But beware, for the path is not without its dangers. Only those with true insight may tread safely.")
 
   - name: ancient ruin
     description: "Crumbled stone pillars and toppled statues hint at a lost civilization. Vines wrap around broken walls, nature reclaiming what was once grand."
     links:
-      - haunted grove
       - hidden waterfall
+      - arion's tomb
     items:
       - name: stone tablet
         type: Useable
-        description: "A moss-covered tablet with faded carvings. Perhaps it tells a forgotten story."
+        description: "A moss-covered tablet with faded carvings, telling a near-forgotten story."
         verb: "read"
-        func: |
-          if hasattr(Entity.player, 'mushroom_insight'):
-            print("You hold the moss-covered tablet. The words seem to shift and change, revealing a hidden message as the mushroom insight takes hold:\n")
-          elif hasattr(Entity.player, 'potion_insight'):
-            print("You hold the moss-covered tablet. The words seem to shift and change, revealing a hidden message as the potion insight takes hold:\n")
-          else:
-            print("You hold the moss-covered tablet. The words seem to shift and change, but you can't quite make them out. Maybe some magical insight would help?\n")
-          if hasattr(Entity.player, 'mushroom_insight') or hasattr(Entity.player, 'potion_insight'):
-            print("""The hero Arion, with silver eyes, traveled across distant mountains to slay monsters born from shadow. Alongside him walked his companion Selene—a woman of great wisdom, whose heart knew no fear.
-          
+        use_msg: |
           In forests of crystal, they faced the serpent Rimewyrm whose breath turned rivers into ice. Beneath crimson skies, they defeated the beast Dreamrender whose roar shattered dreams. Their legend grew with every victory, binding their fates tighter.
           
           Yet whispers foretold tragedy. A cursed mirror showed Arion glimpses of treachery, twisted reflections he refused to believe.
@@ -162,11 +163,12 @@ rooms:
           
           He fell, betrayed but understanding, his silver eyes fading beneath a broken moon.
           
-          Selene lingered alone among the ruins, a hero no longer, carrying the weight of a world saved but forever lost.""")
+          Selene lingered alone among the ruins, a hero no longer, carrying the weight of a world saved but forever lost.
 
   - name: arion's tomb
     description: "A hidden tomb shrouded in mist. The air is thick with sorrow, and the ground is littered with broken stones."
-    links: []
+    links:
+      - ancient ruin
     items:
       - name: crypt
         type: Item
@@ -557,10 +559,10 @@ doors:
     room1: tower stairs
     room2: tower
 
-  - name: hidden door
+  - name: secret portal
     hidden: true
     locked: false
-    room1: arion's tomb
+    room1: haunted grove
     room2: ancient ruin
     condition: hasattr(Entity.player, 'mushroom_insight') or hasattr(Entity.player, 'potion_insight')
 
