@@ -50,7 +50,13 @@ class Adventure(cmd2.Cmd):
                             item_class = globals()[item['type']]
                             if 'func' in item:
                                 def closure(func):
-                                    return lambda var=None: exec(func)
+                                    return lambda var=None: exec(func, {
+                                        'game': game,
+                                        'player': player,
+                                        'world': world_obj,
+                                        'news': news,
+                                        'var': var
+                                    })
                                 item['func'] = closure(item['func']) or True
                             item_class(**item, game=game, player=player, world=world_obj)
                             Room.get(room['name'], world=world_obj).add_item(item_class.get(item['name'], world=world_obj))
@@ -64,7 +70,14 @@ class Adventure(cmd2.Cmd):
                         if door.get('hidden', False):
                             if 'condition' in door:
                                 def closure(condition):
-                                    return lambda var=None, game=game, player=player, world=world_obj, news=news: eval(condition)
+                                    return lambda var=None: eval(condition, {
+                                        'game': game,
+                                        'player': player,
+                                        'world': world_obj,
+                                        'news': news,
+                                        'door': door,
+                                        'var': var
+                                    })
                                 door['condition'] = closure(door['condition']) or True
                             HiddenDoor(**door, game=game, player=player, world=world_obj)
                         else:
@@ -73,8 +86,15 @@ class Adventure(cmd2.Cmd):
                         character_class = globals()[character['type']]
                         if 'func' in character:
                             def closure(func):
-                                return lambda var=None, game=game, player=player, world=world_obj, news=news: exec(func)
+                                return lambda var=None: exec(func, {
+                                    'game': game,
+                                    'player': player,
+                                    'world': world_obj,
+                                    'news': news,
+                                    'var': var
+                                })
                             character['func'] = closure(character['func']) or True
+                        character['news'] = news
                         character_obj = character_class(**character, game=game, player=player, world=world_obj)
                         character_obj.go(Room.get(character['current_room'], world=world_obj))
                         try:
@@ -226,6 +246,11 @@ class Adventure(cmd2.Cmd):
     def preloop(self):
         self.output("Welcome to the adventure game!   Type help or ? to list commands.\n")
         self.current_room_intro()
+
+    def game_over(self):
+        self.output("Game over!")
+        self.postloop()
+        self.reset()
 
 if __name__ == '__main__':
     game = Adventure()

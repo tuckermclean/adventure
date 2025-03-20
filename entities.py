@@ -111,7 +111,7 @@ class Entity:
         popped = 0
         for entity in self.world.traverse():
             try:
-                self.get(entity).pop(name)
+                self.get(entity, world=self.world).pop(name)
                 popped = popped + 1
             except NoEntityLinkException:
                 pass
@@ -184,7 +184,7 @@ class Room(Entity):
         if 'links' in kwargs:
             for link in kwargs['links']:
                 try:
-                    self.link_room(self.get(link, self.world))
+                    self.link_room(self.get(link, world=self.world))
                 except NoEntityLinkException:
                     pass
 

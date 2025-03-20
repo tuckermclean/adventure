@@ -72,9 +72,9 @@ class Weapon(Useable):
 
     def use(self, target=None):
         if target == None:
-            target = Character.get(input(f"Who do you want to hit? {list(dict(filter(lambda pair : type(pair[1]) in [Character, AICharacter, WalkerCharacter, NonPlayerCharacter], self.player.current_room.get_items().items())).keys())}: "))
+            target = Character.get(input(f"Who do you want to hit? {list(dict(filter(lambda pair : type(pair[1]) in [Character, AICharacter, WalkerCharacter, NonPlayerCharacter], self.player.current_room.get_items().items())).keys())}: ", world=self.world))
         elif type(target) == str:
-            target = Character.get(target)
+            target = Character.get(target, world=self.world)
 
         if type(target) in [Character, AICharacter, WalkerCharacter, NonPlayerCharacter]:
             target.take_damage(self.damage)
@@ -89,12 +89,23 @@ class Eatable(Useable):
 
     def use(self):
         super().use()
+        popped = 0
         try:
             # Remove the item from the player's inventory
             self.player.inv_items.pop(self.name)
+            popped += 1
         except:
             pass
-        return self.world.purge(self.name)
+        
+        try:
+            # Remove the item from the room
+            self.player.current_room.pop(self.name)
+            popped += 1
+        except:
+            pass
+        
+        popped += self.world.purge(self.name)
+        return popped > 0
 
 class Phone(Useable):
     def __init__(self, name="phone", description="An old phone", cost=0.25, costmsg="No service", mobile=False, game=None, player=None, world=None, **kwargs):
@@ -105,7 +116,7 @@ class Phone(Useable):
 
     def use(self, callee: str=None):
         self.game.output(f"This phone costs $ {self.cost} to use.")
-        callees = dict(filter(lambda pair : pair[1].phoneable, AICharacter.get_all().items()))
+        callees = dict(filter(lambda pair : pair[1].phoneable, AICharacter.get_all(world=self.world).items()))
         if callee == None:
             self.game.output("Who you gonna call? ", end="")
             self.game.output(list(callees.keys()))

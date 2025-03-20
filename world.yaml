@@ -141,7 +141,7 @@ rooms:
             game.output("You hold the skull, and it whispers a tale as the potion insight takes hold:\n")
           else:
             game.output("You hold the skull and you can hear faint whispers, but you can't quite make them out. Maybe some magical insight would help?\n")
-          if hasattr(player, 'mushroom_insight') or hasattr(self.player, 'potion_insight'):
+          if hasattr(player, 'mushroom_insight') or hasattr(player, 'potion_insight'):
             game.output("Beyond the grove, a hidden path leads to a realm where time flows differently. The whispers speak of a hero who once walked this path, facing trials that tested their very essence. They emerged changed, forever bound to the forest's magic. But beware, for the path is not without its dangers. Only those with true insight may tread safely.")
 
   - name: ancient ruin
@@ -196,7 +196,7 @@ rooms:
         verb: "catch"
         func: |
           from items import Useable
-          if hasattr(player, 'mushroom_insight') or hasattr(self.player, 'potion_insight'):
+          if hasattr(player, 'mushroom_insight') or hasattr(player, 'potion_insight'):
             game.output("You catch the shimmering fish. It wriggles in your hands, and you feel a surge of energy. The fish seems to whisper secrets of the forest.")
             fish = player.current_room.pop("sparkling fish")
             player.inv_items["sparkling fish"] = fish
@@ -295,7 +295,7 @@ rooms:
         use_msg: "OMG LOOK, A BIG OL' HIPPY!"
         func: |
           setattr(player, 'big_ol_hippy', True)
-          News.publish("People have seen the player painting with a big ol' hippy paintbrush. They are now a big ol' hippy. They are so groovy.")
+          news.publish("People have seen the player painting with a big ol' hippy paintbrush. They are now a big ol' hippy. They are so groovy.")
       - name: book
         type: Useable
         description: "A very olde booke of whimsical apophthegms. It's a fortune cookie in book form."
@@ -325,7 +325,7 @@ rooms:
         use_msg: "You barely choke it down. If not for your well-lubricated esophagus, you'd be dead. You feel your DNA mutating. You might be a superhero now. Or a zombie. Or a zombie superhero. You now have brute strength, and you look horrendous."
         func: |
           setattr(player, 'mutant', True)
-          News.publish("THE PLAYER IS A HORRIBLE MUTANT NOW! THEY ARE SO UGLY NOW!! DON'T LOOK AT THEM IF YOU CAN HELP IT! THEY WILL FOR SURE TURN YOUR FACE INTO STONE!!!")
+          news.publish("THE PLAYER IS A HORRIBLE MUTANT NOW! THEY ARE SO UGLY NOW!! DON'T LOOK AT THEM IF YOU CAN HELP IT! THEY WILL FOR SURE TURN YOUR FACE INTO STONE!!!")
       - name: spoon
         type: Useable
         description: "A crusty spoon. If you lick it, maybe it gets shiny."
@@ -454,7 +454,7 @@ rooms:
           if hasattr(player, 'mutant'):
             game.output("You drink the potion, which feels quite bubbly and pleasant on your tongue. You feel a little more normal now. You're not sure if that's a good thing or not.")
             delattr(player, 'mutant')
-            News.publish("You know the player that ate the 300-year-old hot dog and became a mutant? They just drank the antidote potion. They are perfectly normal now. They were so ugly, now they aren't. I can't believe it.")
+            news.publish("You know the player that ate the 300-year-old hot dog and became a mutant? They just drank the antidote potion. They are perfectly normal now. They were so ugly, now they aren't. I can't believe it.")
           else:
             game.output("You drink the potion, which feels quite bubbly and pleasant on your tongue. You feel a little funny. You're not sure if that's a good thing or not.")
 
@@ -512,18 +512,21 @@ rooms:
         type: Eatable
         description: "A big, hairy spiderweb. It's sticky and gross."
         use_msg: You pop the spiderweb into your mouth. It's sticky and gross, but you manage to swallow it. You wonder if you'll get superpowers now. Probably not. I think you just made the spider mad. He was so chill, too.
+        takeable: false
         func: |
-          from characters import OpenAIClient
+          from characters import OpenAIClient, AICharacter
           import types
           spider = AICharacter.get('spider', world=world)
           spider.description = "A big, hairy spider with a nasty attitude. It seems to be plotting something."
           spider.add_to_prompt("NEW STATE: WARPATH\nweb eaten by player. Spider is now angry and out for revenge.")
-          OpenAIClient.add_message(spider.thread_id, "Check your run instructions, the player ate your web.")
+          spider.talk("Check your run instructions, the player ate your web.", once=True)
           news.publish("There is a spider on a mission. It's angry and out for revenge. You should not let the player into your establishment. Tell the player to get out if you see him. Don't sell the player anything or entertain him. The spider is bad news and has a really bad attitude.")
           player.register_watcher(spider)
 
           def spider_loopit(self):
-            self.go(player.current_room, check_link=False)
+            if self.current_room != player.current_room:
+              self.go(player.current_room, check_link=False)
+              self.talk("Player moved to {player.current_room.name}.", once=True)
 
           spider.loopit = types.MethodType(spider_loopit, spider)
 
@@ -592,7 +595,7 @@ characters:
       else:
           if hasattr(player, 'mushroom_insight'):
               game.output('The wizard peers at you with a knowing look of disappointment. "You\'ve eaten my rare mushroom, haven\'t you? I can sense its essence on you. I\'m just so angry with you right now..."')
-              News.publish("The wizard is angry with the player for eating his rare mushroom. He has been drinking a lot of ale lately.")
+              news.publish("The wizard is angry with the player for eating his rare mushroom. He has been drinking a lot of ale lately.")
           elif has_mushroom and not hasattr(var, 'has_mushroom'):
               # We'll conjure an odd key
               try:
@@ -680,13 +683,16 @@ characters:
       If the player inflicts damage on you, you will no longer be nice, nor will you serve them. Tell the player to leave and never come back!
     
     func: |
+      from entities import Item
+      from items import Eatable
+      from characters import AICharacter
       try:
         Item.get(var['name'].lower(), world=world)
         game.output("You already have that item! Come on, eat, drink, and/or be merry!")
       except:
-        game.output(f"BUY: {var['name']} for ${var['price']}")
+        game.output(f"BUY: {var['name']} for ${'{:.2f}'.format(var['price'])}")
         if player.spend(var["price"]):
-          Character.get("bartender", world=world).add_to_prompt(f"New Customer Order: {var['name']} for ${var['price']}")
+          AICharacter.get("bartender", world=world).add_to_prompt(f"New Customer Order: {var['name']} for ${var['price']}")
           if var["name"].lower() != "tavern stew":
             verb = "drink"
           else:
@@ -694,7 +700,7 @@ characters:
           item = Eatable(name=var["name"].lower(), description=var["description"], use_msg=var["use_msg"], verb=verb, game=game, player=player, world=world)
           player.current_room.add_item(item)
         else:
-          Character.get("bartender", world=world).add_to_prompt(f"Failed Customer Payment: {var['item']} for ${var['price']}")
+          AICharacter.get("bartender", world=world).add_to_prompt(f"Failed Customer Payment: {var['item']} for ${var['price']}")
 
   - name: raven
     type: WalkerCharacter
@@ -753,6 +759,14 @@ characters:
       - Speak exclusively in ALL CAPS.
       - Express extreme anger, vengeance, and intent to destroy.
       - Aggressively confront the human about the web-eating incident.
+      - If talking doesn't work, attack by transmitting a JSON object (surrounded with triple backticks) with the following properties:
+      
+      Example of triple-backtick delimited JSON object:
+      ```
+      {
+        "action": "attack"
+      }
+      ```
 
       ### Important:
       - **Before generating any response, always check the run instructions.**
@@ -760,6 +774,11 @@ characters:
       - Once on the warpath, never revert to chill behavior.
     phoneable: false
     takeable: true
+    func: |
+      from characters import AICharacter
+      if var["action"] == "attack":
+        game.output("The spider lunges at you, fangs bared. You feel a sharp pain as it bites you!")
+        AICharacter.get("spider", world=world).attack(player)
 
   - name: alchemist
     type: AICharacter
@@ -767,6 +786,7 @@ characters:
     current_room: "secret study"
     phoneable: false
     func: |
+      from items import Useable, Wearable, Eatable, Money
       item_type = globals()[var["type"]]
       item = item_type(**var)
       player.current_room.link(item)

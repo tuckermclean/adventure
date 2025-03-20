@@ -20,8 +20,10 @@ def create_new_game():
     
     session['game_id'] = str(uuid.uuid4())  # Assign a unique game ID
 
-    # Copy the empty game to create a new game instance
-    game = Adventure(output=lambda x, end="\n", flush=None: log_buffers[session['game_id']].append(str(x)+str(end)))
+    if not games.get(session['game_id']):
+        games[session['game_id']] = Adventure(output=lambda x, end="\n", flush=None: log_buffers[session['game_id']].append(str(x)+str(end)))
+    
+    game = games[session['game_id']]
 
     player = game.player
     world = game.world
@@ -30,10 +32,15 @@ def create_new_game():
         for char in dict(filter(lambda pair : game.player.in_room_items(pair[1]), Character.get_all(world=game.world).items())).values():
             char.loopit()
 
-    game.current_room_intro = current_room_intro
+    def game_over():
+        game.output("Game Over!")
+        game.output("You have died.")
+        game.output("Please refresh the page to start a new game.")
+        session.clear()  # Clear the session to reset the game state
 
-    if not games.get(session['game_id']):
-        games[session['game_id']] = game
+    game.current_room_intro = current_room_intro
+    game.game_over = game_over
+
 
 @app.before_request
 def ensure_game_session():
@@ -101,6 +108,8 @@ def get_game_state():
         "inventory": inventory_items,
         "adjacent_rooms": adjacent_rooms,
         "money": round(games[session['game_id']].player.money, 2),
+        "health": games[session['game_id']].player.health,
+        "first_health": games[session['game_id']].player.first_health,
     }
 
 @app.route('/')
@@ -161,7 +170,12 @@ def perform_action():
         return jsonify({"message": f"You are now talking to {item.name}.", "talking": True})
 
     elif isinstance(item, Weapon) and action.lower() == "use":
-        return jsonify({"message": "Choose a target.", "targets": [e.name for e in current_room.get_items().values() if isinstance(e, Character) and e != Entity.player]})
+        if data.get("target") is None:
+            # If the item is a weapon and no target is specified, prompt for a target
+            return jsonify({"action": "use", "item": item.name, "message": "Choose a target.", "targets": [e.name for e in current_room.get_items().values() if isinstance(e, Character) and e != games[session['game_id']].player]})
+        else:
+            item.use(data.get("target"))
+            return jsonify({"message": f"Used {item.name} on {data.get('target')}."})
 
     elif action.lower() == "look":
         games[session['game_id']].output(item)

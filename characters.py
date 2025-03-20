@@ -44,7 +44,7 @@ class Character(Item):
     def spend(self, amount):
         if self.money >= amount:
             self.money = self.money - amount
-            self.game.output('$', '{:.2f}'.format(amount), 'spent.')
+            self.game.output(f'${'{:.2f}'.format(amount)} spent.')
 #FIXME            self.do_inv()
             return amount
         else:
@@ -78,15 +78,17 @@ class Character(Item):
         self.health -= damage
         self.game.output(self.damage_msg)
         self.game.output(f"{self.name.title()} took {damage} damage. Health: {self.health} ({self.health / self.first_health * 100:.2f}%)")
-        self.news.publish(f"{self.name.title()} just got hit by the {attacker.title()} and took {damage} damage. Health: {self.health} ({self.health / self.first_health * 100:.2f}%)")
+        if self.news != None:
+            self.news.publish(f"{self.name.title()} just got hit by the {attacker.title()} and took {damage} damage. Health: {self.health} ({self.health / self.first_health * 100:.2f}%)")
         if self.health <= 0:
             self.die()
         else:
-            self.attack(Entity.player)
+            self.attack(self.player)
 
     def die(self):
         self.game.output(f"{self.name.title()} has died.")
-        self.news.publish(f"{self.name.title()} has died.")
+        if self.news != None:
+            self.news.publish(f"{self.name.title()} has died.")
         self.current_room.pop(self.name)
         self.world.purge(self.name)
         try:
@@ -95,7 +97,7 @@ class Character(Item):
             pass
         if self.name == "player":
             self.game.output("Game over.")
-            exit()
+            self.game.game_over()
     
     def attack(self, target):
         if self.attack_strength != None:
@@ -288,7 +290,7 @@ class AICharacter(Character):
     def attack(self, target):
         super().attack(target)
         if self.attack_strength != None:
-            msg = f"You just attacked the {target.name}, and they took {self.attack_strength} damage. Their health is now {Entity.player.health / Entity.player.first_health * 100:.2f}%). Don't mention their health percentage explicitly."
+            msg = f"You just attacked the {target.name}, and they took {self.attack_strength} damage. Their health is now {self.player.health / self.player.first_health * 100:.2f}%). Don't mention their health percentage explicitly."
             self.talk(msg=msg, once=True)
 
     def notify_news(self, news):
