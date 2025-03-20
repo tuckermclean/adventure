@@ -8,10 +8,10 @@ from news import News
 class Adventure(cmd2.Cmd):
     def __init__(self, player=None, world=None, file="world.yaml", output=print):
         self.prompt = "> "
-        if len(sys.argv) > 1:
-            self.file = sys.argv[1]
-        elif file is not None and world is None:
+        if file is not None and world is None:
             self.file = file
+        elif len(sys.argv) > 1:
+            self.file = sys.argv[1]
         if world is None:
             self.world = World(game=self, warn=False)
         else:
@@ -29,7 +29,11 @@ class Adventure(cmd2.Cmd):
         self.output = output
 
         if self.file is not None:
-            self.world = Adventure.load_world(self.file, game=self, player=self.player, news=self.news)
+            # If self.file exists:
+            if os.path.exists(self.file):
+                self.world = Adventure.load_world(filename=self.file, game=self, player=self.player, news=self.news)
+            else:
+                raise FileNotFoundError(f"No world file found: {self.file}")
 
         # Go to first room
         self.player.go(list(Room.get_all(world=self.world).values())[0])

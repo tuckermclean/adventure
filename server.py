@@ -4,7 +4,7 @@ from characters import Character, AICharacter
 from entities import Entity, Room, HiddenDoor
 from items import Weapon
 from adventure import Adventure
-import sys, io, uuid, time
+import os, uuid
 
 app = Flask(__name__, static_url_path='', static_folder='static')
 CORS(app)  # Enable CORS for all routes
@@ -15,13 +15,13 @@ app.secret_key = "supersecretkey"  # Replace with a secure key
 log_buffers = {}
 games = {}
 
-def create_new_game():
+def create_new_game(file=os.getenv("WORLD_FILE", "world.yaml")
+):
     """Creates a new game instance for a session."""
-    
     session['game_id'] = str(uuid.uuid4())  # Assign a unique game ID
 
     if not games.get(session['game_id']):
-        games[session['game_id']] = Adventure(output=lambda x="", end="\n\n", flush=None: log_buffers[session['game_id']].append(str(x)+str(end)))
+        games[session['game_id']] = Adventure(file=file, output=lambda x="", end="\n\n", flush=None: log_buffers[session['game_id']].append(str(x)+str(end)))
     
     game = games[session['game_id']]
 

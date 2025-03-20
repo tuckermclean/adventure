@@ -4,6 +4,8 @@ pyyaml
 pillow
 flask
 flask_cors
+gunicorn
+gevent
 
 # Development dependencies
 pytest
