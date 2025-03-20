@@ -93,10 +93,9 @@ class Character(Item):
         self.world.purge(self.name)
         try:
             self.player.unregister_watcher(self)
-        except KeyError:
+        except:
             pass
         if self.name == "player":
-            self.game.output("Game over.")
             self.game.game_over()
     
     def attack(self, target):
@@ -285,13 +284,16 @@ class AICharacter(Character):
         elif attacker == None:
             attacker = "player"
         if self.health > 0:
-            OpenAIClient.add_message(self.thread_id, f"You just got hit by the {attacker}, and you took {damage} damage. Your health is now {self.health / self.first_health * 100:.2f}%) and you are really angry now. Don't mention your health percentage explicitly.")
+            self.add_to_prompt(f"You just got hit by the {attacker}, and you took {damage} damage. Your health is now {self.health / self.first_health * 100:.2f}%) and you are really angry now. Don't mention your health percentage explicitly.")
 
     def attack(self, target):
         super().attack(target)
         if self.attack_strength != None:
             msg = f"You just attacked the {target.name}, and they took {self.attack_strength} damage. Their health is now {self.player.health / self.player.first_health * 100:.2f}%). Don't mention their health percentage explicitly."
-            self.talk(msg=msg, once=True)
+            try:
+                self.talk(msg=msg, once=True)
+            except:
+                self.add_to_prompt(msg)
 
     def notify_news(self, news):
         self.add_to_prompt(f"NEWS BULLETIN: {news}")
@@ -317,7 +319,7 @@ class AICharacter(Character):
         full_message = ""
         bye = False
 
-        self.game.output("\nCharacter response:\n")
+        self.game.output(f"{self.name.capitalize()}: ", end="", flush=True)
 
         try:
             for chunk in OpenAIClient.stream_assistant_response(thread_id, assistant_name, additional_instructions=self.additional_instructions):
@@ -335,7 +337,7 @@ class AICharacter(Character):
             self.game.output("Error:", e)
             bye = True
 
-        self.game.output("\n")
+        self.game.output()
 
         if re.search(hangups, full_message.lower(), re.IGNORECASE) or re.search(hangups, user_message.lower(), re.IGNORECASE):
             bye = True

@@ -4,7 +4,7 @@ from characters import Character, AICharacter
 from entities import Entity, Room, HiddenDoor
 from items import Weapon
 from adventure import Adventure
-import sys, io, uuid, copy
+import sys, io, uuid, time
 
 app = Flask(__name__, static_url_path='', static_folder='static')
 CORS(app)  # Enable CORS for all routes
@@ -21,7 +21,7 @@ def create_new_game():
     session['game_id'] = str(uuid.uuid4())  # Assign a unique game ID
 
     if not games.get(session['game_id']):
-        games[session['game_id']] = Adventure(output=lambda x, end="\n", flush=None: log_buffers[session['game_id']].append(str(x)+str(end)))
+        games[session['game_id']] = Adventure(output=lambda x="", end="\n\n", flush=None: log_buffers[session['game_id']].append(str(x)+str(end)))
     
     game = games[session['game_id']]
 
@@ -36,7 +36,8 @@ def create_new_game():
         game.output("Game Over!")
         game.output("You have died.")
         game.output("Please refresh the page to start a new game.")
-        session.clear()  # Clear the session to reset the game state
+        del games[session['game_id']]
+        create_new_game()
 
     game.current_room_intro = current_room_intro
     game.game_over = game_over

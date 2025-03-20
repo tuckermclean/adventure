@@ -136,11 +136,11 @@ rooms:
         verb: "listen"
         func: |
           if hasattr(player, 'mushroom_insight'):
-            game.output("You hold the skull, and it whispers a tale as the mushroom insight takes hold:\n")
+            game.output("You hold the skull, and it whispers a tale as the mushroom insight takes hold:")
           elif hasattr(player, 'potion_insight'):
-            game.output("You hold the skull, and it whispers a tale as the potion insight takes hold:\n")
+            game.output("You hold the skull, and it whispers a tale as the potion insight takes hold:")
           else:
-            game.output("You hold the skull and you can hear faint whispers, but you can't quite make them out. Maybe some magical insight would help?\n")
+            game.output("You hold the skull and you can hear faint whispers, but you can't quite make them out. Maybe some magical insight would help?")
           if hasattr(player, 'mushroom_insight') or hasattr(player, 'potion_insight'):
             game.output("Beyond the grove, a hidden path leads to a realm where time flows differently. The whispers speak of a hero who once walked this path, facing trials that tested their very essence. They emerged changed, forever bound to the forest's magic. But beware, for the path is not without its dangers. Only those with true insight may tread safely.")
 
@@ -296,21 +296,21 @@ rooms:
         func: |
           setattr(player, 'big_ol_hippy', True)
           news.publish("People have seen the player painting with a big ol' hippy paintbrush. They are now a big ol' hippy. They are so groovy.")
-      - name: book
-        type: Useable
-        description: "A very olde booke of whimsical apophthegms. It's a fortune cookie in book form."
-        verb: "read"
-        use_msg: "You open the book to a random spot, and read this:\n"
-        func: |
-          import subprocess, os
-          env = os.environ.copy()
-          if os.name == 'nt':
-            env['FORTUNE_PATH'] = 'C:\\Users\\me\\AppData\\Local\\Packages\\PythonSoftwareFoundation.Python.3.12_qbz5n2kfra8p0\\LocalCache\\local-packages\\share\\games\\fortune'
-          subprocess.run('fortune', env=env)
-      - name: computer
-        type: Computer
-        description: "Would you look at that?! It's an old computer."
-        mobile: false
+      #- name: book
+      #  type: Useable
+      #  description: "A very olde booke of whimsical apophthegms. It's a fortune cookie in book form."
+      #  verb: "read"
+      #  use_msg: "You open the book to a random spot, and read this:\n"
+      #  func: |
+      #    import subprocess, os
+      #    env = os.environ.copy()
+      #    if os.name == 'nt':
+      #      env['FORTUNE_PATH'] = 'C:\\Users\\me\\AppData\\Local\\Packages\\PythonSoftwareFoundation.Python.3.12_qbz5n2kfra8p0\\LocalCache\\local-packages\\share\\games\\fortune'
+      #    subprocess.run('fortune', env=env)
+      #- name: computer
+      #  type: Computer
+      #  description: "Would you look at that?! It's an old computer."
+      #  mobile: false
 
   - name: dining room
     description: "This dining room has rotten food all over. It's disgusting!"
@@ -331,12 +331,12 @@ rooms:
         description: "A crusty spoon. If you lick it, maybe it gets shiny."
         verb: "lick"
         use_msg: "Did you like that? Was it satisfying for you?"
-      - name: cell phone
-        type: Phone
-        description: "An old flip phone. Might be out of service."
-        cost: 0.01
-        costmsg: "No money, no service!"
-        mobile: true
+      #- name: cell phone
+      #  type: Phone
+      #  description: "An old flip phone. Might be out of service."
+      #  cost: 0.01
+      #  costmsg: "No money, no service!"
+      #  mobile: true
 
   - name: hallway
     description: "A dimly lit hallway that smells of dusty old ladies and even older cheese."
@@ -542,7 +542,8 @@ rooms:
         takeable: false
         func: |
           from characters import OpenAIClient
-          OpenAIClient.oneoff_prompt("Briefly describe the present view of a hilariously cursed, mystical forest from a tall tower through binoculars. No need to mention the binoculars or the tower. Over the treetops, you can see the wizard's tower. He's usually doing something ridiculous, not juggling. One or two punchy sentences, 50 words max.", output=game.output)
+          OpenAIClient.oneoff_prompt("Briefly describe the present view of a hilariously cursed, mystical forest from a tall tower through binoculars. No need to mention the binoculars or the tower. Over the treetops, you can see the wizard's tower. He's usually doing something ridiculous, not juggling. One or two punchy sentences, 50 words max.", output=lambda x: game.output(x, end=""))
+          game.output()
 
 doors:
   - name: back door
@@ -584,6 +585,7 @@ characters:
     verb: "talk"
     use_msg: null
     attack_strength: 10
+    health: 10
     attack_msg: "The wizard waves his wand, and a bolt of energy zaps you. Ouch!"
     func: |
       import sys
@@ -602,13 +604,13 @@ characters:
                   player.inv_items["odd key"]
                   game.output("You already have the odd key. Why would you choose to hang out with the wizard? He's awful and really no fun at parties.")
               except:
-                  game.output('The wizard cackles: "Aha, my beloved mushroom! Allow me to reward you..."')
                   del player.inv_items["rare mushroom"]
                   setattr(var, 'has_mushroom', True)
                   from entities import Item
                   odd_key = Item("odd key", "A swirling runic key conjured by the wizard. It glows slightly.", game=game, player=player, world=world)
                   player.current_room.add_item(odd_key)
-                  game.output("The wizard snaps his fingers, and an odd key appears. He grins, a little too widely. \"There you go! Now, be off with you!\"")
+                  odd_key.do("take")
+                  game.output('The wizard cackles: "Aha, my beloved mushroom! Allow me to reward you..." He snaps his fingers and an odd key appears. He grins, a little too widely. "There you go! Now, be off with you!"')
                   news.publish("The wizard has gotten his mushroom. He is now very happy. He has given the player an odd key.")
                   game.current_room_intro()
           elif hasattr(var, 'has_mushroom'):

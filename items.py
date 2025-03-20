@@ -103,7 +103,7 @@ class Eatable(Useable):
             popped += 1
         except:
             pass
-        
+
         popped += self.world.purge(self.name)
         return popped > 0
 
@@ -125,7 +125,7 @@ class Phone(Useable):
             if self.player.spend(self.cost):
                 self.game.output("**RINGING**")
                 callees[callee].talk(phone=True)
-                self.game.output("\n*Thank you, call again.*\n")
+                self.game.output("*Thank you, call again.*")
                 self.game.current_room_intro()
             else:
                 self.game.output(self.costmsg)
