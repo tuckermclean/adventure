@@ -1,7 +1,9 @@
 cmd2
 openai
 pyyaml
-PIL
+pillow
+flask
+flask_cors
 
 # Development dependencies
 pytest
