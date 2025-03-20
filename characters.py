@@ -148,7 +148,7 @@ class OpenAIClient():
             OpenAIClient.client = openai.OpenAI(api_key=api_key)
 
     @staticmethod
-    def get_or_create_assistant(name, instructions, model="gpt-4-turbo"):
+    def get_or_create_assistant(name, instructions, model="gpt-4o-mini"):
         OpenAIClient.connect()
 
         if name in OpenAIClient.assistants_cache:

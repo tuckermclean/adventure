@@ -62,7 +62,8 @@
         #actions, 
         #items, 
         #adjacent-rooms, 
-        #inventory {
+        #inventory,
+        #modal-choices {
         flex: 0 0 auto;
         margin-top: 0.5rem;
         border: 1px solid #ccc;
@@ -345,10 +346,18 @@
             if (data.talking) {
                 startConversation(item);
             } if (data.targets) {
-                showModal(data.message, data.targets, (target) => {
-                    executeAction(action, item, { target: target });
-                    hideModal();
-                });
+                if (data.targets.length === 1) {
+                    executeAction(action, item, { target: data.targets[0] });
+                } else if (data.targets.length === 0) {
+                    addLog("No targets available for this action.\n\n");
+                } else {
+                     // Show a modal dialog with the choices
+                    showModal(data.message, data.targets, (target) => {
+                        executeAction(action, item, { target: target });
+                        hideModal();
+                    });
+                }
+                updateUI();
             }
         }
 

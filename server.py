@@ -37,6 +37,7 @@ def create_new_game():
         game.output("You have died.")
         game.output("Please refresh the page to start a new game.")
         del games[session['game_id']]
+        session.clear()
         create_new_game()
 
     game.current_room_intro = current_room_intro
