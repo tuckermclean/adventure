@@ -10,6 +10,7 @@
         height: 100%;
         margin: 0;
         font-size: 1.5vh;
+        background-color: #eee
         }
 
         /* Use flex on body for center alignment */
@@ -28,10 +29,8 @@
         width: 100%;
         height: 100vh; /* fills the viewport */
         margin: 0;
-        padding: 1rem;
         box-sizing: border-box;
-        border: 1px solid #ccc;
-        border-radius: 0.5rem;
+        background-color: #fff;
         }
 
         /* Room image takes a proportional amount of height and positions location text at its bottom */
@@ -42,12 +41,11 @@
         background-color: #eee;
         background-position: center;
         background-size: cover;
-        border-radius: 0.5rem;
         }
 
         /* Place the location text overlay at the bottom of the room image */
         #location {
-        margin: 30vh 0 0 0;
+        margin: 25vh 0 0 0;
         color: white;
         background: rgba(0, 0, 0, 0.5);
         font-size: large; /* responsive font-size */
@@ -58,25 +56,39 @@
         text-align: center;
         }
 
+        #description {
+        flex: 0 0 auto;
+        padding: 1rem;
+        margin: 0;
+        }
+
         /* Sections for actions, items, etc. remain auto-height */
         #actions, 
         #items, 
         #adjacent-rooms, 
         #inventory,
-        #modal-choices {
-        flex: 0 0 auto;
-        margin-top: 0.5rem;
+        #modal-choices,
+        #money, #health {
+        display: flex;            /* Make this a flex container */
+        flex-wrap: wrap;          /* Allow items to wrap onto new lines */
+        align-items: flex-start;  /* Prevent vertical stretching */
+        justify-content: flex-start; /* Or 'center', 'space-between', etc. */
         border: 1px solid #ccc;
-        padding: 1rem 0.25rem;
+        padding: 0.25rem;
         border-radius: 0.25rem;
         text-align: center;
         min-width: 1rem;
+        min-height: 2.5rem;
+        width: fit-content;
         }
 
         /* Button containers and labels */
         span.buttons {
-        display: inline-block;
-        width: fit-content;
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: flex-start;
+        align-items: end; 
+        width: 100%;
         padding: 0.5rem;
         line-height: 2.5rem;
         }
@@ -90,7 +102,7 @@
 
         span.buttons span.label {
         display: inline-block;
-        min-width: 10rem;
+        min-width: 8rem;
         text-align: right;
         padding-right: 0.5rem;
         }
@@ -179,7 +191,7 @@
         /* Optional: Adjust sizes for smaller viewports */
         @media (max-height: 600px) {
         #room-image {
-            flex: 0 0 25vh;
+            flex: 0 0 20vh;
         }
         #location {
             font-size: 1.2rem;
@@ -221,7 +233,7 @@
         </span>
 
         <span class="buttons">
-            <span class="label">Money:</span> $<span id="money"></span>
+            <span class="label">Money:</span> <span id="money"></span>
             <span class="label">Health:</span> <span id="health"></span>
         </span>
 
@@ -293,7 +305,7 @@
             document.getElementById("room-image").style.backgroundImage = `url('/images/${gameData.location.replace(/ /g, "_").replace(/'/g, "_")}.jpeg')`;
             // Format money as a number with commas and two decimal places
             gameData.money = parseFloat(gameData.money).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-            document.getElementById("money").innerText = gameData.money;
+            document.getElementById("money").innerText = "$"+gameData.money;
             document.getElementById("health").innerText = (gameData.health / gameData.first_health * 100).toFixed(2) + "%";
             fetchLogs();
         }
