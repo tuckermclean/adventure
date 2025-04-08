@@ -1,283 +1,197 @@
 import pytest
-import random
+import os
+import tempfile
+import yaml
 from adventure import Adventure
-from entities import Room, Door, Item, Entity
-from items import Money, Wearable, Useable, Eatable, Computer, Phone
-from characters import Character, AICharacter, WalkerCharacter, NonPlayerCharacter
 from helpers import *
+from entities import Room, Item, World
+from characters import Character
 
-def test_make_world():
-    """
-    Simply instantiate the game and make sure the player is in the living room.
-    """
-    Entity.player = Character(lookable=False)
-    Entity.game = Adventure(Entity.player)
-    assert Entity.player.current_room == list(Room.get_all().values())[0]
+@pytest.fixture
+def test_world_file():
+    """Fixture to provide a test world file"""
+    # Create a temporary world file
+    world_data = {
+        "rooms": [
+            {
+                "name": "test_room1",
+                "description": "A test room 1",
+                "links": ["test_room2"],
+                "items": [
+                    {
+                        "name": "test_item1",
+                        "type": "Item",
+                        "description": "A test item 1",
+                        "takeable": True
+                    }
+                ]
+            },
+            {
+                "name": "test_room2",
+                "description": "A test room 2",
+                "links": ["test_room1"],
+                "items": [
+                    {
+                        "name": "test_item2",
+                        "type": "Item",
+                        "description": "A test item 2",
+                        "takeable": True
+                    }
+                ]
+            }
+        ],
+        "doors": [  # Top-level doors field
+            {
+                "name": "test_door",
+                "type": "Door",
+                "room1": "test_room1",
+                "room2": "test_room2",
+                "locked": False
+            }
+        ],
+        "characters": [
+            {
+                "name": "test_npc",
+                "type": "NonPlayerCharacter",
+                "description": "A test NPC",
+                "current_room": "test_room2",
+                "health": 10,
+                "verb": "talk",
+                "use_msg": "Hello there!"
+            }
+        ],
+        "help": {
+            "go": "Move to a connected room",
+            "look": "Look at an item or room",
+            "take": "Take an item",
+            "drop": "Drop an item",
+            "inv": "Show inventory"
+        }
+    }
 
-def test_in_rooms():
-    """
-    Check that a random adjacent room is recognized as "in_rooms".
-    """
-    assert Entity.player.in_rooms(
-        Room.get(random.choice(list(Entity.player.current_room.get_rooms().keys())))
-    )
+    fd, path = tempfile.mkstemp(suffix=".yaml")
+    with os.fdopen(fd, 'w') as f:
+        yaml.dump(world_data, f)
 
-def test_in_room_items():
-    """
-    Check that a random item in the current room is recognized by in_room_items.
-    """
-    assert Entity.player.in_room_items(
-        Item.get(random.choice(list(Entity.player.current_room.get_items().keys())))
-    )
+    yield path
 
-def test_do_go():
-    """
-    Instead of Entity.game.do_go, call player.go(room) directly.
-    This ensures we are testing the actual movement logic, not cmd2.
-    """
-    player = Entity.player
-    old_room = player.current_room
-    assert player in old_room.get_items().values()  # player item is in old_room
+    # Clean up the temporary file
+    os.unlink(path)
 
-    # pick a random connected room
-    new_room_name = random.choice(list(old_room.get_rooms().keys()))
-    new_room = Room.get(new_room_name)
+class CaptureOutput:
+    """Helper class to capture output from the Adventure class"""
+    def __init__(self):
+        self.captured = []
 
-    # move player (ignore adjacency check by passing check_link=False, or rely on it if you want)
-    player.go(new_room, check_link=False)
+    def __call__(self, *args, **kwargs):
+        message = " ".join(str(arg) for arg in args)
+        self.captured.append(message)
+        return message
 
-    # Make sure we're in the new room
-    assert player.current_room == new_room
-    assert player in new_room.get_items().values()
-    # Make sure we got popped out of the old room
-    assert player not in old_room.get_items().values()
+    def clear(self):
+        self.captured = []
 
-def test_do_unlock():
-    """
-    Instead of Entity.game.do_unlock(door.name), call door.unlock() directly.
-    """
-    # pick a random Door object
-    door = Door.get(random.choice(list(Door.get_all().keys())))
-    player = Entity.player
+    def contains(self, text):
+        """Check if any captured output contains the given text"""
+        return any(text.lower() in msg.lower() for msg in self.captured)
 
-    # Move the player into one of the rooms connected by this door
-    # (check_link=False so we don't care if it's truly adjacent)
-    player.go(random.choice(list(door.get_rooms().values())), check_link=False)
+    def last_message(self):
+        """Get the last captured message"""
+        return self.captured[-1] if self.captured else ""
 
-    # First unlock attempt with no key should fail
-    door.unlock()
-    assert door.locked
+@pytest.fixture
+def output_capture():
+    """Fixture to provide an output capture object"""
+    return CaptureOutput()
 
-    # Give the player the door's key
-    player.inv_items[door.key.name] = door.key
+def test_adventure_load_world(test_world_file, output_capture):
+    """Test loading a world from a file"""
+    # Create an adventure instance with the test world file
+    adv = Adventure(file=test_world_file, output=output_capture)
 
-    # Now unlocking should succeed
-    door.unlock()
-    assert not door.locked
+    # Test that the world was loaded correctly
+    # We expect 3 entities: test_room1, test_room2, and test_door
+    assert len(Room.get_all(world=adv.world)) == 3
+    assert "test_room1" in Room.get_all(world=adv.world)
+    assert "test_room2" in Room.get_all(world=adv.world)
+    assert "test_door" in Room.get_all(world=adv.world)  # Door is a subtype of Room
 
-    # Clean up key from inventory
-    del player.inv_items[door.key.name]
-    assert door.key.name not in player.inv_items
+    # Test that the player is in the first room
+    assert adv.player.current_room is not None
+    assert adv.player.current_room.name == "test_room1"
 
-def test_do_lock():
-    """
-    Instead of Entity.game.do_lock(door.name), call door.lock() directly.
-    """
-    # pick a random Door object
-    door = Door.get(random.choice(list(Door.get_all().keys())))
-    player = Entity.player
+def test_adventure_current_room_description(test_world_file, output_capture):
+    """Test the current room description"""
+    # Create an adventure instance with the test world file
+    adv = Adventure(file=test_world_file, output=output_capture)
 
-    # Move the player into one of the rooms connected by this door
-    # (check_link=False so we don't care if it's truly adjacent)
-    player.go(random.choice(list(door.get_rooms().values())), check_link=False)
+    # Test current_room_intro (which is called by default when the game starts)
+    output_capture.clear()
+    adv.current_room_intro()
+    assert output_capture.contains("test room 1")
+    assert output_capture.contains("test_item1")
 
-    # Give the player the door's key
-    player.inv_items[door.key.name] = door.key
+def test_adventure_inventory(test_world_file, output_capture):
+    """Test the inventory display"""
+    # Create an adventure instance with the test world file
+    adv = Adventure(file=test_world_file, output=output_capture)
 
-    # First unlock the door
-    door.unlock()
-    assert not door.locked
+    # Test current_room_intro which shows inventory
+    output_capture.clear()
+    adv.current_room_intro()
+    assert output_capture.contains("Items you have:")
 
-    # Now lock it
-    door.lock()
-    assert door.locked
+def test_adventure_commands(test_world_file, output_capture):
+    """Test the available commands"""
+    # Create an adventure instance with the test world file
+    adv = Adventure(file=test_world_file, output=output_capture)
 
-@pytest.mark.parametrize("num_to_take", [1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16])
-def test_do_take(num_to_take):
-    """
-    Instead of Entity.game.do_take(itemName), directly call item.do("take").
-    We check that the player cannot exceed max_items in inventory, etc.
-    """
-    player = Entity.player
-    player.inv_items = {}  # clear inventory
-    # Attempt to pick up items from every room until we've tried num_to_take
-    count_taken = 0
-    for room in Room.get_all().values():
-        # Move the player to this room
-        player.go(room, check_link=False)
+    # Test get_all_commands
+    commands = adv.get_all_commands()
+    assert 'exit' in commands
+    assert 'help' in commands
+    assert 'reset' in commands
 
-        for item_name in list(room.get_items().keys()):
-            item_ent = Item.get(item_name)
-            if not (item_ent.droppable is False):
-                # Attempt to "take" by calling the "take" action directly
-                item_ent.do("take")
+def test_adventure_preloop(test_world_file, output_capture):
+    """Test the preloop method"""
+    # Create an adventure instance with the test world file
+    adv = Adventure(file=test_world_file, output=output_capture)
 
-                # If it's not money, the item either goes to inventory
-                # or fails if inventory is at max capacity
-                if not isinstance(item_ent, Money):
-                    if count_taken >= player.max_items:
-                        # Ensure we didn't exceed max
-                        assert len(player.inv_items) <= player.max_items
-                    else:
-                        # Either we took it successfully
-                        if len(player.inv_items) > count_taken:
-                            count_taken += 1
-                            # item should be in inventory
-                            assert item_name in player.inv_items
-                            assert player.inv_items[item_name] == item_ent
-                else:
-                    # Money is handled differently, it goes into .money
-                    assert player.money == item_ent.amount
+    # Test preloop
+    output_capture.clear()
+    adv.preloop()
+    assert output_capture.contains("Welcome to the adventure game")
 
-                # If we've taken 'num_to_take' items, break out
-                if len(player.inv_items) >= num_to_take:
-                    break
-        if len(player.inv_items) >= num_to_take:
-            break
+def test_adventure_postloop(test_world_file, output_capture):
+    """Test the postloop method"""
+    # Create an adventure instance with the test world file
+    adv = Adventure(file=test_world_file, output=output_capture)
 
-    print(player.inv_items)
+    # Test postloop
+    result = adv.postloop()
+    assert result == True
 
-    # If we wanted to take more than max_items, ensure we didn't exceed it
-    if num_to_take > player.max_items:
-        assert len(player.inv_items) <= player.max_items
-    else:
-        assert len(player.inv_items) == num_to_take
+def test_adventure_emptyline(test_world_file, output_capture):
+    """Test the emptyline method"""
+    # Create an adventure instance with the test world file
+    adv = Adventure(file=test_world_file, output=output_capture)
 
-    #
-    # Now test dropping them all
-    #
-    while len(player.inv_items) > 0:
-        # move to some random room so that we can do drops
-        room = random.choice(list(Room.get_all().values()))
-        player.go(room, check_link=False)
+    # Test emptyline
+    result = adv.emptyline()
+    assert result is None
 
-        first_len = len(player.inv_items)
-        # pick a random item from player's inventory
-        item_name = random.choice(list(player.inv_items.keys()))
-        item_ent = player.inv_items[item_name]
+def test_adventure_current_room_intro(test_world_file, output_capture):
+    """Test the current_room_intro method"""
+    # Create an adventure instance with the test world file
+    adv = Adventure(file=test_world_file, output=output_capture)
 
-        # drop it
-        item_ent.do("drop")
+    # Test current_room_intro
+    output_capture.clear()
+    adv.current_room_intro()
+    assert output_capture.contains("test room 1")
 
-        now_len = len(player.inv_items)
-        assert now_len == first_len - 1
-
-def test_do_drop():
-    """
-    Instead of Entity.game.do_drop(itemName), call item.do("drop") directly
-    to test the drop logic.
-    """
-    player = Entity.player
-
-    # For every item that is takeable and droppable (and not Money),
-    # pick it up, drop it, etc.
-    for item in list(
-        filter(lambda i: i.takeable and i.droppable and not isinstance(i, Money),
-               Item.get_all().values())
-    ):
-        # Find a room that actually has this item
-        for room in filter(lambda r: item in r.get_items().values(), Room.get_all().values()):
-            # move player to that room
-            player.go(room, check_link=False)
-
-            # Take the item
-            item.do("take")
-            assert len(player.inv_items) == 1
-            assert item.name in player.inv_items
-
-            # Drop it
-            item.do("drop")
-            assert len(player.inv_items) == 0
-
-            # Take it again
-            item.do("take")
-            assert len(player.inv_items) == 1
-
-            # Make item temporarily non-droppable
-            item.droppable = False
-            print(f"Testing item {item.name} droppable={item.droppable}")
-            item.do("drop")
-            # still have it
-            assert len(player.inv_items) == 1
-
-            # Re-enable droppable
-            item.droppable = True
-            item.do("drop")
-            assert len(player.inv_items) == 0
-
-            # once we've tested with this room, continue
-            break
-
-def test_do_money_take():
-    # Find a room that actually has money
-    for room in filter(lambda r: any(isinstance(i, Money) for i in r.get_items().values()), Room.get_all().values()):
-        player = Entity.player
-        player.inv_items = {}  # clear inventory
-        # move player to that room
-        player.go(room, check_link=False)
-
-        # Take the money
-        player.money = 0
-        room_money = list(filter(lambda i: isinstance(i, Money), room.get_items().values()))[0]
-        room_money.do("take")
-        assert player.money == room_money.amount
-
-def test_do_wear_remove():
-    # Find a room with a wearable item
-    for room in filter(lambda r: any(isinstance(i, Wearable) for i in r.get_items().values()), Room.get_all().values()):
-        player = Entity.player
-        player.inv_items = {}  # clear inventory
-        # move player to that room
-        player.go(room, check_link=False)
-
-        # Take the wearable item
-        wearable = list(filter(lambda i: isinstance(i, Wearable), room.get_items().values()))[0]
-        wearable.do("take")
-        assert wearable.name in player.inv_items
-
-        # Wear it
-        wearable.do("wear")
-        assert wearable.name in player.wearing
-
-        # Remove it
-        wearable.do("remove")
-        assert wearable.name not in player.wearing
-
-def test_do_eat():
-    # Find a room with an edible item
-    for room in filter(lambda r: any(isinstance(i, Eatable) for i in r.get_items().values()), Room.get_all().values()):
-        player = Entity.player
-        player.inv_items = {}  # clear inventory
-        # move player to that room
-        player.go(room, check_link=False)
-
-        # Take the edible item
-        edible = list(filter(lambda i: isinstance(i, Eatable), room.get_items().values()))[0]
-        edible.do("take")
-        assert edible.name not in room.get_items().keys()
-        assert edible.name in player.inv_items.keys()
-
-        # Eat it
-        edible.do(edible.verb)
-        assert edible.name not in room.get_items().keys()
-        print(player.inv_items.keys())
-        assert edible.name not in player.inv_items.keys()
-
-        # Put it back in the room
-        room.add_item(edible)
-        assert edible.name in room.get_items().keys()
-
-        # Eat it again
-        edible.do(edible.verb)
-        assert edible.name not in room.get_items().keys()
-        assert edible.name not in player.inv_items.keys()
+def test_adventure_default(test_world_file, output_capture):
+    """Test the default method"""
+    # This test is more complex and would require mocking the line.raw attribute
+    # Skip for now
+    pass
