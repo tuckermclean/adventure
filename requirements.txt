@@ -9,4 +9,4 @@ gevent
 
 # Development dependencies
 pytest
-coverage
+pytest-cov
