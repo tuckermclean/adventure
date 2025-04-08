@@ -93,6 +93,10 @@ docker build -t adventure .
 docker run -e OPENAI_API_KEY=your_openai_api_key -p 5000:5000 adventure
 ```
 
+## API Specification
+
+The API specification is available in [API_SPECIFICATION.md](API_SPECIFICATION.md).
+
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
